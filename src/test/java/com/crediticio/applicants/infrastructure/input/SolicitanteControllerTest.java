@@ -1,9 +1,12 @@
 package com.crediticio.applicants.infrastructure.input;
 
 import com.crediticio.applicants.application.dto.RegistrarSolicitanteRequest;
+import com.crediticio.applicants.application.dto.SolicitanteDetalleResponse;
 import com.crediticio.applicants.application.dto.SolicitanteResponse;
 import com.crediticio.applicants.domain.DocumentoDuplicadoException;
 import com.crediticio.applicants.domain.HistorialCrediticio;
+import com.crediticio.applicants.domain.SolicitanteNoEncontradoException;
+import com.crediticio.applicants.ports.input.ConsultarSolicitanteUseCase;
 import com.crediticio.applicants.ports.input.RegistrarSolicitanteUseCase;
 import com.crediticio.shared.exception.GlobalExceptionHandler;
 import com.crediticio.shared.util.TraceIdFilter;
@@ -22,7 +25,9 @@ import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -39,6 +44,9 @@ class SolicitanteControllerTest {
 
     @MockitoBean
     private RegistrarSolicitanteUseCase registrarSolicitanteUseCase;
+
+    @MockitoBean
+    private ConsultarSolicitanteUseCase consultarSolicitanteUseCase;
 
     @Test
     void debeRetornar201YSoloLosCuatroCamposAprobadosCuandoElRegistroEsExitoso() throws Exception {
@@ -182,5 +190,70 @@ class SolicitanteControllerTest {
                 0,
                 HistorialCrediticio.BUENO,
                 new BigDecimal("2.5"));
+    }
+
+    @Test
+    void debeRetornar200YLosNueveCamposCuandoElSolicitanteExiste() throws Exception {
+        SolicitanteDetalleResponse response = new SolicitanteDetalleResponse(
+                1L, "Ana María Pérez", "1234567", new BigDecimal("3000000"), new BigDecimal("500000"),
+                0, HistorialCrediticio.BUENO, new BigDecimal("2.5"), LocalDateTime.of(2026, 1, 1, 10, 0));
+        when(consultarSolicitanteUseCase.consultarPorNumeroDocumento("1234567")).thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/solicitantes/documento/1234567"))
+                .andExpect(status().isOk())
+                .andExpect(header().exists("X-Trace-Id"))
+                .andExpect(jsonPath("$.idSolicitante").value(1))
+                .andExpect(jsonPath("$.nombreCompleto").value("Ana María Pérez"))
+                .andExpect(jsonPath("$.numeroDocumento").value("1234567"))
+                .andExpect(jsonPath("$.ingresosMensuales").value(3000000))
+                .andExpect(jsonPath("$.deudasMensuales").value(500000))
+                .andExpect(jsonPath("$.numeroMoras").value(0))
+                .andExpect(jsonPath("$.historialCrediticio").value("BUENO"))
+                .andExpect(jsonPath("$.antiguedadLaboral").value(2.5))
+                .andExpect(jsonPath("$.fechaRegistro").exists());
+    }
+
+    @Test
+    void debeRetornar404CuandoElSolicitanteNoExiste() throws Exception {
+        when(consultarSolicitanteUseCase.consultarPorNumeroDocumento("9999999"))
+                .thenThrow(new SolicitanteNoEncontradoException());
+
+        mockMvc.perform(get("/api/v1/solicitantes/documento/9999999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("SOLICITANTE_NO_ENCONTRADO"))
+                .andExpect(jsonPath("$.stackTrace").doesNotExist())
+                .andExpect(result -> {
+                    String traceIdHeader = result.getResponse().getHeader("X-Trace-Id");
+                    String traceIdBody = com.jayway.jsonpath.JsonPath.read(
+                            result.getResponse().getContentAsString(), "$.traceId");
+                    assertThat(traceIdBody).isEqualTo(traceIdHeader);
+                });
+    }
+
+    @Test
+    void debeRetornar400CuandoElNumeroDeDocumentoTieneFormatoInvalido() throws Exception {
+        mockMvc.perform(get("/api/v1/solicitantes/documento/abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.stackTrace").doesNotExist())
+                .andExpect(result -> {
+                    String traceIdHeader = result.getResponse().getHeader("X-Trace-Id");
+                    String traceIdBody = com.jayway.jsonpath.JsonPath.read(
+                            result.getResponse().getContentAsString(), "$.traceId");
+                    assertThat(traceIdBody).isEqualTo(traceIdHeader);
+                });
+    }
+
+    @Test
+    void noDebeInvocarElCasoDeUsoDeRegistroAlConsultarUnSolicitante() throws Exception {
+        SolicitanteDetalleResponse response = new SolicitanteDetalleResponse(
+                1L, "Ana María Pérez", "1234567", new BigDecimal("3000000"), new BigDecimal("500000"),
+                0, HistorialCrediticio.BUENO, new BigDecimal("2.5"), LocalDateTime.of(2026, 1, 1, 10, 0));
+        when(consultarSolicitanteUseCase.consultarPorNumeroDocumento("1234567")).thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/solicitantes/documento/1234567"))
+                .andExpect(status().isOk());
+
+        verifyNoInteractions(registrarSolicitanteUseCase);
     }
 }

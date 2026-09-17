@@ -8,6 +8,8 @@ import jakarta.persistence.PersistenceContext;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
+import java.util.Optional;
+
 @Component
 public class SolicitanteRepositoryAdapter implements SolicitanteRepositoryPort {
 
@@ -35,6 +37,12 @@ public class SolicitanteRepositoryAdapter implements SolicitanteRepositoryPort {
     @Override
     public boolean existePorNumeroDocumento(String numeroDocumento) {
         return solicitanteJpaRepository.existsByNumeroDocumento(numeroDocumento);
+    }
+
+    @Override
+    public Optional<Solicitante> buscarPorNumeroDocumento(String numeroDocumento) {
+        return solicitanteJpaRepository.findByNumeroDocumento(numeroDocumento)
+                .map(this::aDominio);
     }
 
     private SolicitanteJpaEntity aJpaEntity(Solicitante solicitante) {

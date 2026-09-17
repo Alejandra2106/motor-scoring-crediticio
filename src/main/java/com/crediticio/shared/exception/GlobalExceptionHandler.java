@@ -1,7 +1,9 @@
 package com.crediticio.shared.exception;
 
 import com.crediticio.applicants.domain.DocumentoDuplicadoException;
+import com.crediticio.applicants.domain.SolicitanteNoEncontradoException;
 import com.crediticio.shared.response.ApiError;
+import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -46,6 +48,22 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> manejarDocumentoDuplicado(DocumentoDuplicadoException ex) {
         log.warn("Intento de registro con un número de documento ya existente");
         return construirRespuesta(HttpStatus.CONFLICT, "DOCUMENTO_DUPLICADO", ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(SolicitanteNoEncontradoException.class)
+    public ResponseEntity<ApiError> manejarSolicitanteNoEncontrado(SolicitanteNoEncontradoException ex) {
+        log.warn("Consulta de un solicitante que no existe");
+        return construirRespuesta(HttpStatus.NOT_FOUND, "SOLICITANTE_NO_ENCONTRADO", ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ApiError> manejarViolacionDeRestriccion(ConstraintViolationException ex) {
+        List<String> details = ex.getConstraintViolations().stream()
+                .map(violation -> violation.getPropertyPath() + ": " + violation.getMessage())
+                .toList();
+        log.warn("Solicitud rechazada por violación de una restricción de validación");
+        return construirRespuesta(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                "Los datos enviados no son válidos", details);
     }
 
     @ExceptionHandler(Exception.class)

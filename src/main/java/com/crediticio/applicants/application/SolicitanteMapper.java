@@ -1,6 +1,7 @@
 package com.crediticio.applicants.application;
 
 import com.crediticio.applicants.application.dto.RegistrarSolicitanteRequest;
+import com.crediticio.applicants.application.dto.SolicitanteDetalleResponse;
 import com.crediticio.applicants.application.dto.SolicitanteResponse;
 import com.crediticio.applicants.domain.Solicitante;
 import org.springframework.stereotype.Component;
@@ -24,6 +25,19 @@ public class SolicitanteMapper {
                 solicitante.getIdSolicitante(),
                 solicitante.getNombreCompleto(),
                 solicitante.getNumeroDocumento(),
+                solicitante.getFechaRegistro());
+    }
+
+    public SolicitanteDetalleResponse aDetalleResponse(Solicitante solicitante) {
+        return new SolicitanteDetalleResponse(
+                solicitante.getIdSolicitante(),
+                solicitante.getNombreCompleto(),
+                solicitante.getNumeroDocumento(),
+                solicitante.getIngresosMensuales(),
+                solicitante.getDeudasMensuales(),
+                solicitante.getNumeroMoras(),
+                solicitante.getHistorialCrediticio(),
+                solicitante.getAntiguedadLaboral(),
                 solicitante.getFechaRegistro());
     }
 }
