@@ -89,6 +89,30 @@ class SolicitanteRepositoryAdapterIT {
     }
 
     @Test
+    void debeBuscarPorNumeroDocumentoEncontrarElSolicitanteSinModificarloYRetornarVacioSiNoExiste() {
+        Solicitante guardado = solicitanteRepositoryAdapter.guardar(solicitanteNuevo("6001006"));
+
+        Optional<Solicitante> encontrado = solicitanteRepositoryAdapter.buscarPorNumeroDocumento("6001006");
+
+        assertThat(encontrado).isPresent();
+        assertThat(encontrado.get().getIdSolicitante()).isEqualTo(guardado.getIdSolicitante());
+        assertThat(encontrado.get().getNombreCompleto()).isEqualTo(guardado.getNombreCompleto());
+        assertThat(encontrado.get().getNumeroDocumento()).isEqualTo("6001006");
+        assertThat(encontrado.get().getIngresosMensuales()).isEqualByComparingTo(guardado.getIngresosMensuales());
+        assertThat(encontrado.get().getDeudasMensuales()).isEqualByComparingTo(guardado.getDeudasMensuales());
+        assertThat(encontrado.get().getNumeroMoras()).isEqualTo(guardado.getNumeroMoras());
+        assertThat(encontrado.get().getHistorialCrediticio()).isEqualTo(guardado.getHistorialCrediticio());
+        assertThat(encontrado.get().getAntiguedadLaboral()).isEqualByComparingTo(guardado.getAntiguedadLaboral());
+        assertThat(encontrado.get().getFechaRegistro()).isEqualTo(guardado.getFechaRegistro());
+
+        Optional<SolicitanteJpaEntity> persistidoTrasConsultar = solicitanteJpaRepository.findByNumeroDocumento("6001006");
+        assertThat(persistidoTrasConsultar).isPresent();
+        assertThat(persistidoTrasConsultar.get().getIdSolicitante()).isEqualTo(guardado.getIdSolicitante());
+
+        assertThat(solicitanteRepositoryAdapter.buscarPorNumeroDocumento("6009998")).isEmpty();
+    }
+
+    @Test
     void laBaseDeDatosDebeRechazarIngresosMensualesNegativosAunSaltandoLaValidacionDeDominio() {
         // El dominio (Solicitante) jamás permitiría este valor: se construye la entidad JPA
         // directamente para comprobar que la restricción de integridad definitiva vive en la
