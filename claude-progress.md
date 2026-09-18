@@ -90,12 +90,40 @@
 
 ### HU03 - Crear variable de riesgo
 
-* **Estado**: PENDIENTE
-* **Descripción breve**: Crear una nueva variable de riesgo utilizable en el scoring.
-* **Criterios de aceptación**: pendiente de documentar.
-* **Implementación**: pendiente.
-* **Pruebas**: pendiente.
-* **Observaciones**: ninguna.
+* **Estado**: COMPLETADA
+* **Descripción breve**: Crear una nueva variable de riesgo, seleccionada de un conjunto cerrado de cinco variables, con una descripción validada, para que quede disponible para la evaluación crediticia.
+* **Criterios de aceptación**:
+  * Permitir seleccionar la variable únicamente entre `INGRESOS_MENSUALES`, `NIVEL_ENDEUDAMIENTO`, `NUMERO_MORAS`, `HISTORIAL_CREDITICIO` y `ANTIGUEDAD_LABORAL`.
+  * Registrar una descripción obligatoria, sin estar compuesta únicamente por espacios, de entre 10 y 255 caracteres.
+  * Rechazar la creación si la variable no pertenece al conjunto permitido o si algún campo obligatorio no cumple sus validaciones.
+  * Rechazar la creación si ya existe una variable de riesgo con el mismo nombre, informando la duplicidad.
+  * Generar automáticamente el identificador de la variable y crearla en estado `ACTIVA`.
+  * Persistir la variable únicamente tras superar todas las validaciones.
+  * Registrar automáticamente la fecha y hora de creación (no enviable por el cliente).
+  * Retornar `HTTP 201` con `idVariableRiesgo`, `variable`, `tipo`, `descripcion` y `estado`.
+* **Implementación**:
+  * Endpoint `POST /api/v1/variables-riesgo` para crear variables de riesgo.
+  * Nuevo módulo `riskvariables`, organizado con Package by Feature y Ports & Adapters, siguiendo el mismo patrón ya usado en `applicants`.
+  * Enum de dominio `NombreVariableRiesgo` con las cinco variables permitidas, cada una asociada a su `TipoVariableRiesgo` (`NUMERICO` o `CATEGORICO`); el tipo se deriva del enum en tiempo de uso y no se persiste como columna.
+  * Enum de dominio `EstadoVariableRiesgo`, con únicamente el valor `ACTIVA` en esta HU (los estados adicionales quedan para HU05).
+  * Entidad de dominio `VariableRiesgo` (sin dependencias de Spring ni JPA) con invariantes sobre la descripción (obligatoria, sin solo espacios, 10-255 caracteres tras recorte) y estado inicial `ACTIVA` fijado por el propio dominio (Creator).
+  * `CrearVariableRiesgoUseCase` / `CrearVariableRiesgoService` (`@Transactional`), que valida la unicidad de la variable antes de guardar.
+  * Puerto de salida `VariableRiesgoRepositoryPort` y adaptador de persistencia mediante JPA (`VariableRiesgoRepositoryAdapter`), que traduce una violación de integridad de PostgreSQL a `VariableRiesgoDuplicadaException`.
+  * Migración `V2__create_riesgo_table.sql`: tabla `riesgo` con `id_riesgo`, `variable` (`NOT NULL`, `UNIQUE`, `CHECK` contra las cinco variables permitidas), `descripcion`, `estado` (`NOT NULL`, `DEFAULT 'ACTIVA'`, `CHECK (estado = 'ACTIVA')`) y `fecha_creacion` (`NOT NULL DEFAULT CURRENT_TIMESTAMP`).
+  * `GlobalExceptionHandler` extendido de forma aditiva con el manejo de `VariableRiesgoDuplicadaException` (`HTTP 409`, código `VARIABLE_RIESGO_DUPLICADA`).
+  * No se implementó autenticación, autorización, usuarios ni roles. RF09/RNF01 relacionados con la identificación del Administrador de riesgo quedan documentados como dependencia funcional futura, igual que RF16 de HU01. No se persiste ningún campo de usuario creador en esta HU.
+* **Pruebas**:
+  * Pruebas unitarias de dominio (`VariableRiesgoTest`): estado inicial `ACTIVA`, recorte y validación de la descripción, derivación del tipo desde la variable, reconstrucción de la entidad.
+  * Pruebas de validación de Bean Validation del DTO de entrada (`CrearVariableRiesgoRequestValidationTest`).
+  * Pruebas unitarias del servicio de aplicación (`CrearVariableRiesgoServiceTest`): creación exitosa y rechazo por variable duplicada.
+  * Pruebas de controlador mediante MockMvc (`VariableRiesgoControllerTest`): 201 con exactamente los cinco campos aprobados, 400 por variable/descripción inválidas, 409 por duplicado, 500 genérico sin exponer detalles internos.
+  * Prueba de integración de persistencia contra PostgreSQL local real (`VariableRiesgoRepositoryAdapterIT`, perfil `it`): generación de ID y `fecha_creacion`, lectura de todos los campos, restricción `UNIQUE` de `variable`, y verificación mediante SQL nativo de que las restricciones `CHECK` de `variable` y de `estado` viven en la base de datos.
+  * Suite completa ejecutada con `./mvnw.cmd clean test`: 78 pruebas, sin fallos.
+  * Prueba de integración ejecutada manualmente contra PostgreSQL local (`-Dtest=VariableRiesgoRepositoryAdapterIT -Dspring.profiles.active=it`): 7 pruebas, sin fallos.
+* **Observaciones**:
+  * RF09 y RNF01 relacionados con la identificación y autorización del Administrador de riesgo quedan fuera del alcance de HU03 y serán implementados mediante una HU de autenticación/autorización futura, siguiendo el mismo criterio ya aplicado en HU01 (RF16).
+  * El nombre del campo `variable` en el request y en el response fue aprobado explícitamente como parte del contrato de la API, para su reutilización en HU04 y HU05.
+  * El enum `EstadoVariableRiesgo` se dejó deliberadamente con un único valor (`ACTIVA`); su extensión (por ejemplo `INACTIVA`) y la correspondiente restricción `CHECK` en base de datos quedan para HU05, mediante una nueva migración Flyway (sin modificar `V2__create_riesgo_table.sql`).
 
 ### HU04 - Editar variable de riesgo
 

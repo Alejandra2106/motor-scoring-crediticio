@@ -2,6 +2,7 @@ package com.crediticio.shared.exception;
 
 import com.crediticio.applicants.domain.DocumentoDuplicadoException;
 import com.crediticio.applicants.domain.SolicitanteNoEncontradoException;
+import com.crediticio.riskvariables.domain.VariableRiesgoDuplicadaException;
 import com.crediticio.shared.response.ApiError;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
@@ -54,6 +55,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> manejarSolicitanteNoEncontrado(SolicitanteNoEncontradoException ex) {
         log.warn("Consulta de un solicitante que no existe");
         return construirRespuesta(HttpStatus.NOT_FOUND, "SOLICITANTE_NO_ENCONTRADO", ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(VariableRiesgoDuplicadaException.class)
+    public ResponseEntity<ApiError> manejarVariableRiesgoDuplicada(VariableRiesgoDuplicadaException ex) {
+        log.warn("Intento de creación de una variable de riesgo con un nombre ya existente");
+        return construirRespuesta(HttpStatus.CONFLICT, "VARIABLE_RIESGO_DUPLICADA", ex.getMessage(), List.of());
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
