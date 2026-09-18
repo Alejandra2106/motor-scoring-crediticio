@@ -1,0 +1,11 @@
+package com.crediticio.riskvariables.ports.output;
+
+import com.crediticio.riskvariables.domain.NombreVariableRiesgo;
+import com.crediticio.riskvariables.domain.VariableRiesgo;
+
+public interface VariableRiesgoRepositoryPort {
+
+    VariableRiesgo guardar(VariableRiesgo variableRiesgo);
+
+    boolean existePorVariable(NombreVariableRiesgo variable);
+}
