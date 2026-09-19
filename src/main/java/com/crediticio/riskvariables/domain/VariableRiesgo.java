@@ -63,4 +63,8 @@ public class VariableRiesgo {
     public TipoVariableRiesgo getTipo() {
         return variable.getTipo();
     }
+
+    public VariableRiesgo cambiarEstado(EstadoVariableRiesgo nuevoEstado) {
+        return new VariableRiesgo(idVariableRiesgo, variable, descripcion, nuevoEstado, fechaCreacion);
+    }
 }

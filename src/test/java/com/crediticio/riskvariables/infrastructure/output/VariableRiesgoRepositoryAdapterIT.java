@@ -4,6 +4,7 @@ import com.crediticio.riskvariables.domain.EstadoVariableRiesgo;
 import com.crediticio.riskvariables.domain.NombreVariableRiesgo;
 import com.crediticio.riskvariables.domain.VariableRiesgo;
 import com.crediticio.riskvariables.domain.VariableRiesgoDuplicadaException;
+import com.crediticio.riskvariables.domain.VariableRiesgoNoEncontradaException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -18,6 +19,7 @@ import java.sql.SQLException;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
@@ -105,12 +107,99 @@ class VariableRiesgoRepositoryAdapterIT {
     }
 
     @Test
-    void laBaseDeDatosDebeRechazarUnEstadoDiferenteDeActivaAunSaltandoLaValidacionDeDominio() {
-        // El dominio (EstadoVariableRiesgo) solo conoce ACTIVA en HU03: se comprueba aquí que
-        // la restricción de integridad definitiva (ck_riesgo_estado) vive en la base de datos.
+    void laBaseDeDatosDebeRechazarUnEstadoFueraDelConjuntoPermitidoAunSaltandoLaValidacionDeDominio() {
+        // Desde HU04, ck_riesgo_estado permite ACTIVA e INACTIVA: se comprueba aquí que la
+        // restricción de integridad definitiva sigue rechazando cualquier otro valor.
         assertThatThrownBy(() -> ejecutarInsertNativo(
-                "NIVEL_ENDEUDAMIENTO", "Descripción válida con más de diez caracteres", "INACTIVA"))
+                "NIVEL_ENDEUDAMIENTO", "Descripción válida con más de diez caracteres", "SUSPENDIDA"))
                 .isInstanceOf(SQLException.class);
+    }
+
+    @Test
+    void laBaseDeDatosDebePermitirElEstadoInactivaDesdeHu04() throws SQLException {
+        VariableRiesgo guardada = variableRiesgoRepositoryAdapter.guardar(
+                variableRiesgoNueva(NombreVariableRiesgo.HISTORIAL_CREDITICIO));
+
+        // El insert nativo usa una conexión JDBC ajena al rollback transaccional de
+        // @DataJpaTest (autoCommit=true), por lo que el registro insertado queda
+        // persistido de forma permanente y debe limpiarse explícitamente en el finally.
+        try {
+            assertThatCode(() -> ejecutarInsertNativo(
+                    "ANTIGUEDAD_LABORAL", "Descripción válida con más de diez caracteres", "INACTIVA"))
+                    .doesNotThrowAnyException();
+
+            Optional<VariableRiesgoJpaEntity> leida = variableRiesgoJpaRepository.findById(guardada.getIdVariableRiesgo());
+            assertThat(leida).isPresent();
+        } finally {
+            eliminarPorVariableNativo("ANTIGUEDAD_LABORAL");
+        }
+    }
+
+    @Test
+    void debeBuscarPorIdUnaVariableExistenteYRetornarVacioSiNoExiste() {
+        VariableRiesgo guardada = variableRiesgoRepositoryAdapter.guardar(
+                variableRiesgoNueva(NombreVariableRiesgo.INGRESOS_MENSUALES));
+
+        Optional<VariableRiesgo> encontrada = variableRiesgoRepositoryAdapter.buscarPorId(guardada.getIdVariableRiesgo());
+        Optional<VariableRiesgo> noEncontrada = variableRiesgoRepositoryAdapter.buscarPorId(-1L);
+
+        assertThat(encontrada).isPresent();
+        assertThat(encontrada.get().getEstado()).isEqualTo(EstadoVariableRiesgo.ACTIVA);
+        assertThat(noEncontrada).isEmpty();
+    }
+
+    @Test
+    void debeCambiarEstadoDeActivaAInactivaYPersistirFechaModificacionPreservandoLosDemasCampos() {
+        VariableRiesgo guardada = variableRiesgoRepositoryAdapter.guardar(
+                variableRiesgoNueva(NombreVariableRiesgo.NIVEL_ENDEUDAMIENTO));
+        assertThat(guardada.getEstado()).isEqualTo(EstadoVariableRiesgo.ACTIVA);
+
+        VariableRiesgo actualizada = variableRiesgoRepositoryAdapter.guardar(
+                guardada.cambiarEstado(EstadoVariableRiesgo.INACTIVA));
+
+        assertThat(actualizada.getEstado()).isEqualTo(EstadoVariableRiesgo.INACTIVA);
+        assertThat(actualizada.getIdVariableRiesgo()).isEqualTo(guardada.getIdVariableRiesgo());
+        assertThat(actualizada.getVariable()).isEqualTo(guardada.getVariable());
+        assertThat(actualizada.getDescripcion()).isEqualTo(guardada.getDescripcion());
+        assertThat(actualizada.getFechaCreacion()).isEqualTo(guardada.getFechaCreacion());
+
+        VariableRiesgoJpaEntity entityLeida = variableRiesgoJpaRepository.findById(guardada.getIdVariableRiesgo())
+                .orElseThrow();
+        assertThat(entityLeida.getEstado()).isEqualTo(EstadoVariableRiesgo.INACTIVA);
+        assertThat(entityLeida.getFechaModificacion()).isNotNull();
+    }
+
+    @Test
+    void debeReactivarUnaVariablePreviamenteInactivada() {
+        VariableRiesgo guardada = variableRiesgoRepositoryAdapter.guardar(
+                variableRiesgoNueva(NombreVariableRiesgo.HISTORIAL_CREDITICIO));
+        VariableRiesgo inactivada = variableRiesgoRepositoryAdapter.guardar(
+                guardada.cambiarEstado(EstadoVariableRiesgo.INACTIVA));
+
+        VariableRiesgo reactivada = variableRiesgoRepositoryAdapter.guardar(
+                inactivada.cambiarEstado(EstadoVariableRiesgo.ACTIVA));
+
+        assertThat(reactivada.getEstado()).isEqualTo(EstadoVariableRiesgo.ACTIVA);
+        assertThat(reactivada.getIdVariableRiesgo()).isEqualTo(guardada.getIdVariableRiesgo());
+    }
+
+    @Test
+    void debeLanzarVariableRiesgoNoEncontradaAlCambiarEstadoDeUnaVariableInexistente() {
+        VariableRiesgo inexistente = VariableRiesgo.reconstruir(
+                -1L, NombreVariableRiesgo.NUMERO_MORAS, "Descripción válida con más de diez caracteres",
+                EstadoVariableRiesgo.INACTIVA, null);
+
+        assertThatThrownBy(() -> variableRiesgoRepositoryAdapter.guardar(inexistente))
+                .isInstanceOf(VariableRiesgoNoEncontradaException.class);
+    }
+
+    private void eliminarPorVariableNativo(String variable) throws SQLException {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(
+                        "DELETE FROM riesgo WHERE variable = ?")) {
+            statement.setString(1, variable);
+            statement.executeUpdate();
+        }
     }
 
     private void ejecutarInsertNativo(String variable, String descripcion, String estado) throws SQLException {
