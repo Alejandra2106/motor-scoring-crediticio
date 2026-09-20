@@ -4,6 +4,9 @@ import com.crediticio.applicants.domain.DocumentoDuplicadoException;
 import com.crediticio.applicants.domain.SolicitanteNoEncontradoException;
 import com.crediticio.riskvariables.domain.VariableRiesgoDuplicadaException;
 import com.crediticio.riskvariables.domain.VariableRiesgoNoEncontradaException;
+import com.crediticio.scoring.domain.ReglaScoringDuplicadaException;
+import com.crediticio.scoring.domain.ReglaScoringVariableInactivaException;
+import com.crediticio.scoring.domain.ReglaScoringVariableNoEncontradaException;
 import com.crediticio.shared.response.ApiError;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
@@ -69,6 +72,24 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> manejarVariableRiesgoNoEncontrada(VariableRiesgoNoEncontradaException ex) {
         log.warn("Operación sobre una variable de riesgo que no existe");
         return construirRespuesta(HttpStatus.NOT_FOUND, "VARIABLE_RIESGO_NO_ENCONTRADA", ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(ReglaScoringVariableNoEncontradaException.class)
+    public ResponseEntity<ApiError> manejarReglaScoringVariableNoEncontrada(ReglaScoringVariableNoEncontradaException ex) {
+        log.warn("Intento de creación de una regla de scoring sobre una variable de riesgo inexistente");
+        return construirRespuesta(HttpStatus.NOT_FOUND, "VARIABLE_RIESGO_NO_ENCONTRADA", ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(ReglaScoringVariableInactivaException.class)
+    public ResponseEntity<ApiError> manejarReglaScoringVariableInactiva(ReglaScoringVariableInactivaException ex) {
+        log.warn("Intento de creación de una regla de scoring sobre una variable de riesgo inactiva");
+        return construirRespuesta(HttpStatus.CONFLICT, "VARIABLE_RIESGO_INACTIVA", ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(ReglaScoringDuplicadaException.class)
+    public ResponseEntity<ApiError> manejarReglaScoringDuplicada(ReglaScoringDuplicadaException ex) {
+        log.warn("Intento de creación de una regla de scoring duplicada");
+        return construirRespuesta(HttpStatus.CONFLICT, "REGLA_SCORING_DUPLICADA", ex.getMessage(), List.of());
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
