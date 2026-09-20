@@ -7,7 +7,9 @@ import com.crediticio.riskvariables.application.dto.VariableRiesgoResponse;
 import com.crediticio.riskvariables.ports.input.CambiarEstadoVariableRiesgoUseCase;
 import com.crediticio.riskvariables.ports.input.CrearVariableRiesgoUseCase;
 import com.crediticio.shared.response.ApiError;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -34,6 +36,15 @@ public class VariableRiesgoController {
         this.cambiarEstadoVariableRiesgoUseCase = cambiarEstadoVariableRiesgoUseCase;
     }
 
+    @Operation(summary = "Registrar una variable de riesgo",
+            description = "Crea una nueva variable de riesgo a partir del catálogo cerrado de variables soportado por el sistema, junto con su descripción.")
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            content = @Content(
+                    schema = @Schema(implementation = CrearVariableRiesgoRequest.class),
+                    examples = @ExampleObject(
+                            name = "Solicitud válida",
+                            value = "{\n  \"variable\": \"INGRESOS_MENSUALES\",\n  \"descripcion\": \"Ingresos mensuales del solicitante\"\n}")))
     @PostMapping
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Variable de riesgo creada exitosamente",
