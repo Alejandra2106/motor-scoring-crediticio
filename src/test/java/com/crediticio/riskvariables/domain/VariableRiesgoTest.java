@@ -91,6 +91,45 @@ class VariableRiesgoTest {
     }
 
     @Test
+    void cambiarEstadoDeActivaAInactivaDebePreservarLosDemasCampos() {
+        VariableRiesgo variableRiesgo = VariableRiesgo.reconstruir(
+                1L, NombreVariableRiesgo.INGRESOS_MENSUALES, "Ingresos mensuales netos declarados por el solicitante",
+                EstadoVariableRiesgo.ACTIVA, java.time.LocalDateTime.of(2026, 1, 1, 10, 0));
+
+        VariableRiesgo actualizada = variableRiesgo.cambiarEstado(EstadoVariableRiesgo.INACTIVA);
+
+        assertThat(actualizada.getEstado()).isEqualTo(EstadoVariableRiesgo.INACTIVA);
+        assertThat(actualizada.getIdVariableRiesgo()).isEqualTo(variableRiesgo.getIdVariableRiesgo());
+        assertThat(actualizada.getVariable()).isEqualTo(variableRiesgo.getVariable());
+        assertThat(actualizada.getDescripcion()).isEqualTo(variableRiesgo.getDescripcion());
+        assertThat(actualizada.getFechaCreacion()).isEqualTo(variableRiesgo.getFechaCreacion());
+    }
+
+    @Test
+    void cambiarEstadoDeInactivaAActivaDebePreservarLosDemasCampos() {
+        VariableRiesgo variableRiesgo = VariableRiesgo.reconstruir(
+                2L, NombreVariableRiesgo.NUMERO_MORAS, "Número de moras registradas en el historial crediticio",
+                EstadoVariableRiesgo.INACTIVA, java.time.LocalDateTime.of(2026, 1, 1, 10, 0));
+
+        VariableRiesgo actualizada = variableRiesgo.cambiarEstado(EstadoVariableRiesgo.ACTIVA);
+
+        assertThat(actualizada.getEstado()).isEqualTo(EstadoVariableRiesgo.ACTIVA);
+        assertThat(actualizada.getIdVariableRiesgo()).isEqualTo(variableRiesgo.getIdVariableRiesgo());
+        assertThat(actualizada.getVariable()).isEqualTo(variableRiesgo.getVariable());
+        assertThat(actualizada.getDescripcion()).isEqualTo(variableRiesgo.getDescripcion());
+        assertThat(actualizada.getFechaCreacion()).isEqualTo(variableRiesgo.getFechaCreacion());
+    }
+
+    @Test
+    void cambiarEstadoDebeRechazarEstadoNulo() {
+        VariableRiesgo variableRiesgo = VariableRiesgo.nueva(
+                NombreVariableRiesgo.INGRESOS_MENSUALES, "Ingresos mensuales netos declarados por el solicitante");
+
+        assertThatThrownBy(() -> variableRiesgo.cambiarEstado(null))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
     void reconstruirDebePreservarTodosLosCampos() {
         java.time.LocalDateTime fechaCreacion = java.time.LocalDateTime.of(2026, 1, 1, 10, 0);
 

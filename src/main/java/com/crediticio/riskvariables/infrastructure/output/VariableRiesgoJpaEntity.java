@@ -36,6 +36,9 @@ public class VariableRiesgoJpaEntity {
     @Column(name = "fecha_creacion", nullable = false, insertable = false, updatable = false)
     private LocalDateTime fechaCreacion;
 
+    @Column(name = "fecha_modificacion")
+    private LocalDateTime fechaModificacion;
+
     protected VariableRiesgoJpaEntity() {
         // requerido por JPA
     }
@@ -64,5 +67,17 @@ public class VariableRiesgoJpaEntity {
 
     public LocalDateTime getFechaCreacion() {
         return fechaCreacion;
+    }
+
+    public LocalDateTime getFechaModificacion() {
+        return fechaModificacion;
+    }
+
+    public void setEstado(EstadoVariableRiesgo estado) {
+        this.estado = estado;
+    }
+
+    public void setFechaModificacion(LocalDateTime fechaModificacion) {
+        this.fechaModificacion = fechaModificacion;
     }
 }

@@ -3,6 +3,7 @@ package com.crediticio.shared.exception;
 import com.crediticio.applicants.domain.DocumentoDuplicadoException;
 import com.crediticio.applicants.domain.SolicitanteNoEncontradoException;
 import com.crediticio.riskvariables.domain.VariableRiesgoDuplicadaException;
+import com.crediticio.riskvariables.domain.VariableRiesgoNoEncontradaException;
 import com.crediticio.shared.response.ApiError;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
@@ -14,6 +15,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.List;
 
@@ -61,6 +63,19 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> manejarVariableRiesgoDuplicada(VariableRiesgoDuplicadaException ex) {
         log.warn("Intento de creación de una variable de riesgo con un nombre ya existente");
         return construirRespuesta(HttpStatus.CONFLICT, "VARIABLE_RIESGO_DUPLICADA", ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(VariableRiesgoNoEncontradaException.class)
+    public ResponseEntity<ApiError> manejarVariableRiesgoNoEncontrada(VariableRiesgoNoEncontradaException ex) {
+        log.warn("Operación sobre una variable de riesgo que no existe");
+        return construirRespuesta(HttpStatus.NOT_FOUND, "VARIABLE_RIESGO_NO_ENCONTRADA", ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiError> manejarTipoDeArgumentoInvalido(MethodArgumentTypeMismatchException ex) {
+        log.warn("Solicitud rechazada por un parámetro con formato inválido");
+        return construirRespuesta(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                "El parámetro '" + ex.getName() + "' tiene un formato inválido", List.of());
     }
 
     @ExceptionHandler(ConstraintViolationException.class)

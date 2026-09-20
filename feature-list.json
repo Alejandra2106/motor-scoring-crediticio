@@ -18,26 +18,21 @@
     },
     {
       "id": "HU04",
-      "title": "Editar variable de riesgo",
-      "status": "pending"
+      "title": "Gestionar estado de variable de riesgo",
+      "status": "completed"
     },
     {
       "id": "HU05",
-      "title": "Gestionar estado de variable de riesgo",
-      "status": "pending"
-    },
-    {
-      "id": "HU06",
       "title": "Crear regla de scoring",
       "status": "pending"
     },
     {
-      "id": "HU07",
+      "id": "HU06",
       "title": "Editar regla de scoring",
       "status": "pending"
     },
     {
-      "id": "HU08",
+      "id": "HU07",
       "title": "Calcular score crediticio",
       "status": "pending"
     }
