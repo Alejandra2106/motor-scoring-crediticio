@@ -45,6 +45,12 @@ public class SolicitanteRepositoryAdapter implements SolicitanteRepositoryPort {
                 .map(this::aDominio);
     }
 
+    @Override
+    public Optional<Solicitante> buscarPorId(Long idSolicitante) {
+        return solicitanteJpaRepository.findById(idSolicitante)
+                .map(this::aDominio);
+    }
+
     private SolicitanteJpaEntity aJpaEntity(Solicitante solicitante) {
         return new SolicitanteJpaEntity(
                 solicitante.getNombreCompleto(),

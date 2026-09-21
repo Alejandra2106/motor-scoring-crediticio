@@ -202,18 +202,75 @@
 
 ### HU06 - Editar regla de scoring
 
-* **Estado**: PENDIENTE
-* **Descripción breve**: Editar una regla de scoring existente.
-* **Criterios de aceptación**: pendiente de documentar.
-* **Implementación**: pendiente.
-* **Pruebas**: pendiente.
-* **Observaciones**: ninguna.
+* **Estado**: COMPLETADA
+* **Descripción breve**: Editar el operador, el valorCondicion y el puntaje de una regla de scoring existente, preservando su `idRegla`, `idRiesgo`, `estado` y `fechaCreacion`, para mantener actualizado el criterio utilizado posteriormente en el cálculo del score crediticio. No implementa el cálculo del score en sí (HU07).
+* **Criterios de aceptación**:
+  * Identificar la regla mediante `idRegla`; si no existe, `HTTP 404` sin realizar ninguna modificación.
+  * Rechazar la edición si la variable de riesgo asociada está `INACTIVA` (`HTTP 409`), reutilizando la misma validación de HU05.
+  * Validar `operador`, `valorCondicion` (según tipo de variable) y `puntaje` con las mismas reglas de dominio de HU05, sin duplicar la semántica de operadores ni de validación de valores.
+  * Permitir editar una regla conservando su propia combinación `idRiesgo + operador + valorCondicion` (no debe autodetectarse como duplicado contra sí misma).
+  * Rechazar la edición si la nueva combinación duplica la de otra regla existente (`HTTP 409`), verificado tanto en la aplicación (`existeCombinacion` con exclusión del propio `idRegla`) como mediante la restricción `UNIQUE` de PostgreSQL.
+  * El `idRiesgo` y el `estado` de la regla no pueden modificarse mediante este endpoint.
+  * Persistir la edición únicamente tras superar todas las validaciones, de forma transaccional.
+  * Retornar `HTTP 200` con `idRegla`, `idRiesgo`, `operador`, `valorCondicion` y `puntaje` actualizados.
+* **Implementación**:
+  * Endpoint `PATCH /api/v1/reglas-scoring/{idRegla}`, reutilizando el módulo `scoring` de HU05 (Package by Feature, Ports & Adapters).
+  * `EditarReglaScoringRequest` (sin `idRiesgo`, que no es editable) y `EditarReglaScoringUseCase`/`EditarReglaScoringService` (`@Transactional`), que consulta la regla existente, valida la variable asociada vía `ConsultarVariableRiesgoPort` (mismo puerto de HU05, sin duplicarlo), construye la regla editada mediante el nuevo método de dominio `ReglaScoring.editar(...)` y verifica unicidad antes de persistir.
+  * Método de dominio `ReglaScoring.editar(OperadorScoring, String, Integer, TipoVariable, boolean)`, consistente con el diseño inmutable ya usado por `nueva`/`reconstruir`: retorna una nueva instancia preservando `idRegla`, `idRiesgo`, `estado` y `fechaCreacion`.
+  * Nueva excepción de dominio `ReglaScoringNoEncontradaException` (análoga a `VariableRiesgoNoEncontradaException`/`SolicitanteNoEncontradoException`), manejada en `GlobalExceptionHandler` con `HTTP 404` y código `REGLA_SCORING_NO_ENCONTRADA`.
+  * `ReglaScoringRepositoryPort` extendido con `buscarPorId` y una sobrecarga de `existeCombinacion` que excluye el propio `idRegla`; `ReglaScoringRepositoryAdapter.guardar` extendido para soportar también la actualización de una regla existente (mismo criterio que `VariableRiesgoRepositoryAdapter` en HU04: sin método `actualizar` separado).
+  * No se requirió ninguna migración Flyway nueva: la edición reutiliza el esquema de `regla_scoring` ya creado por `V4__create_regla_scoring_table.sql` (sin modificarla).
+  * No se implementó autenticación, autorización, usuarios ni roles. RNF01 (identificación del Administrador de riesgo) queda documentado como dependencia funcional futura, igual que en HU01/HU03/HU04/HU05.
+* **Pruebas**:
+  * Pruebas unitarias de dominio (`ReglaScoringTest`): `editar` preservando `idRegla`/`idRiesgo`/`estado`/`fechaCreacion`, conservación de la combinación propia, rechazo de operador incompatible con variable categórica, valor no numérico, valor categórico fuera de catálogo y puntaje fuera de rango.
+  * Pruebas de validación de Bean Validation del DTO de entrada (`EditarReglaScoringRequestValidationTest`): 8 pruebas.
+  * Pruebas unitarias del servicio de aplicación (`EditarReglaScoringServiceTest`): edición exitosa, regla inexistente, variable asociada inexistente, variable inactiva, combinación duplicada, conservación de la propia combinación, operador incompatible con variable categórica: 7 pruebas.
+  * Pruebas de controlador mediante MockMvc (`ReglaScoringControllerTest`, compartido con HU05): 200 con los cinco campos actualizados, 400 por datos inválidos (incluido `idRegla` no numérico), 404 por regla inexistente, 409 por variable inactiva y por duplicado.
+  * Prueba de integración de persistencia contra PostgreSQL local real (`ReglaScoringRepositoryAdapterIT`, perfil `it`): actualización de una regla existente preservando `idRegla`/`idRiesgo`/`estado`/`fechaCreacion`, verificación mediante lectura directa de la entidad JPA, `existeCombinacion` con exclusión permitiendo la propia combinación y detectando duplicado contra otra regla, y verificación mediante SQL nativo de que la restricción `UNIQUE` de la base de datos rechaza un `UPDATE` que duplique otra fila existente (defensa en profundidad más allá de la validación de la aplicación).
+  * Suite completa ejecutada con `./mvnw.cmd test`: sin fallos (`EditarReglaScoringServiceTest` 7/7, `EditarReglaScoringRequestValidationTest` 8/8, `ReglaScoringControllerTest` 22/22 incluyendo HU05, `ReglaScoringTest` 55/55 incluyendo HU05 y las pruebas de evaluación agregadas por HU07).
+  * Gherkin: `docs/quality/HU06-editar-regla-scoring.feature`.
+* **Observaciones**:
+  * RNF01 relacionado con la autorización del Administrador de riesgo queda fuera del alcance de HU06 y será implementado mediante la HU de autenticación/autorización futura, siguiendo el mismo criterio ya aplicado en HU01/HU03/HU04/HU05.
+  * Implementada y verificada mediante Pull Request y fusionada en `main` (commit de merge `993d9d7`, a partir del commit `fe4a62a` "Implementar HU06: Editar regla de scoring").
+  * Esta sección de `claude-progress.md` estaba desactualizada (`PENDIENTE`/"pendiente de documentar") pese a que la HU ya estaba completa y fusionada; se corrigió a solicitud explícita de María Alejandra.
 
 ### HU07 - Calcular score crediticio
 
-* **Estado**: PENDIENTE
-* **Descripción breve**: Calcular el score crediticio de un solicitante aplicando las reglas de scoring vigentes.
-* **Criterios de aceptación**: pendiente de documentar.
-* **Implementación**: pendiente.
-* **Pruebas**: pendiente.
-* **Observaciones**: ninguna.
+* **Estado**: COMPLETADA (pendiente de commit/push y de revisión final por María Alejandra)
+* **Descripción breve**: Calcular el score crediticio de un solicitante identificado por `idSolicitante` o `numeroDocumento`, evaluando las reglas de scoring `ACTIVA` asociadas a variables de riesgo `ACTIVA` contra sus datos, y registrar la evaluación junto con el detalle (snapshot histórico) de cada regla considerada.
+* **Criterios de aceptación**:
+  * Identificar al solicitante por exactamente uno de `idSolicitante` o `numeroDocumento`; ambos o ninguno es `HTTP 400`; solicitante inexistente es `HTTP 404` y no crea evaluación.
+  * Consultar únicamente variables de riesgo `ACTIVA` y, dentro de ellas, únicamente reglas de scoring `ACTIVA`.
+  * Evaluar cada regla considerada comparando el valor real del solicitante contra `operador`/`valorCondicion`, reutilizando la semántica de operadores de HU05/HU06 (sin duplicarla).
+  * `NIVEL_ENDEUDAMIENTO` se calcula como `(deudas_mensuales / ingresos_mensuales) × 100` (D1); si `ingresos_mensuales = 0` y existe al menos una regla `ACTIVA` sobre esa variable, el cálculo se bloquea completamente con `HTTP 409`, sin crear evaluación ni detalles (D8).
+  * El score total es la suma de `puntajeObtenido` de todas las reglas consideradas (cumplidas y no cumplidas); no se persiste como columna de `EVALUACION` (RF07/CLAUDE.md §12).
+  * Se registran en `DETALLE_EVALUACION` **todas** las reglas consideradas, cumplidas o no (D3), con snapshot de `operadorAplicado`, `valorCondicionAplicado` y `puntajeReglaAplicado` tal como estaban en el momento del cálculo (D2), para que una edición posterior de la regla (HU06, que la modifica en el mismo registro) no altere el histórico.
+  * Persistencia atómica de `EVALUACION` + todos sus `DETALLE_EVALUACION` (`@Transactional` en la capa de aplicación, respaldado por las restricciones e integridad transaccional de PostgreSQL).
+  * No se agregó estado `INACTIVA` para `regla_scoring` (D4); no se modificó el modelo de `SOLICITANTE` (D6); autenticación/autorización quedan fuera de alcance (D7), igual que en HU01-HU06.
+* **Implementación**:
+  * Endpoint `POST /api/v1/evaluaciones`, nuevo módulo `evaluations` (Package by Feature, Ports & Adapters), dueño de la orquestación pero sin absorber reglas de negocio de `scoring`.
+  * Siguiendo el precedente de HU05: `evaluations` no importa clases de dominio de `applicants`, `riskvariables` ni `scoring` en sus capas `domain`/`application`. Se definieron tres puertos de salida propios con sus proyecciones (`ConsultarSolicitanteEvaluacionPort`/`SolicitanteParaEvaluacion`, `ConsultarVariablesActivasEvaluacionPort`/`VariableActivaEvaluada`, `ReglasScoringConsultaPort`/`ResultadoReglaEvaluada`), cada uno implementado por un único adapter de traducción en `evaluations.infrastructure.output` que sí conoce el módulo externo, reutilizando sus puertos de persistencia existentes sin duplicarlos.
+  * Extensiones aditivas (sin modificar comportamiento existente, solo métodos nuevos) a módulos ya existentes: `SolicitanteRepositoryPort`/`SolicitanteRepositoryAdapter` (+`buscarPorId`), `VariableRiesgoRepositoryPort`/`VariableRiesgoRepositoryAdapter`/`VariableRiesgoJpaRepository` (+`listarActivas`), `ReglaScoringRepositoryPort`/`ReglaScoringRepositoryAdapter`/`ReglaScoringJpaRepository` (+`listarActivasPorRiesgos`).
+  * Lógica de evaluación de una regla (RF06) agregada al dominio de `scoring` por Information Expert, sin introducir Strategy (evaluado explícitamente y descartado por no haber variación de comportamiento que lo justifique, según CLAUDE.md §6/§13 de la especificación): `OperadorScoring.comparar(int)` interpreta el resultado de un `compareTo` según el símbolo; `ReglaScoring.evaluar(String valorReal, TipoVariable tipoVariable)` compara numérica o categóricamente reutilizando esa lógica.
+  * Fórmula de `NIVEL_ENDEUDAMIENTO` y bloqueo D8 encapsulados en `evaluations.domain.ValorVariableResolver` (única responsabilidad: resolver el valor real de una variable a partir de la proyección propia del solicitante), con validación defensiva de RF05 (actualmente inalcanzable con el esquema vigente, dado que los campos financieros de `SOLICITANTE` son `NOT NULL` desde HU01).
+  * Entidades de dominio inmutables `Evaluacion` (agrega `getScoreTotal()` sumando los `puntajeObtenido` de sus `DetalleEvaluacion`) y `DetalleEvaluacion` (valida como invariante que `puntajeObtenido` sea consistente con `condicionCumplida` y `puntajeReglaAplicado`), sin dependencias de Spring ni JPA.
+  * `CalcularScoreService` (`@Transactional`): identifica al solicitante, consulta variables activas, determina qué variables tienen reglas vigentes (evitando resolver `NIVEL_ENDEUDAMIENTO`, y por tanto el bloqueo D8, cuando esa variable no tiene ninguna regla activa asociada), evalúa y persiste.
+  * Persistencia mediante `EvaluacionRepositoryPort`/`EvaluacionRepositoryAdapter`, con `EvaluacionJpaEntity`/`DetalleEvaluacionJpaEntity` usando columnas simples (`id_solicitante`, `id_regla` como `Long`, sin relaciones JPA `@ManyToOne`), igual criterio que `regla_scoring` en HU05 para preservar la frontera entre módulos también a nivel de persistencia.
+  * Migración `V5__create_evaluacion_tables.sql`: tablas `evaluacion` (`id_evaluacion`, `id_solicitante` con FK a `solicitante`, `fecha_evaluacion`) y `detalle_evaluacion` (`id_detalle_evaluacion`, `id_evaluacion` con FK, `id_regla` con FK a `regla_scoring`, `operador_aplicado`/`valor_condicion_aplicado`/`puntaje_regla_aplicado` como snapshot, `condicion_cumplida`, `puntaje_obtenido`), sin modificar V1-V4.
+  * `GlobalExceptionHandler` extendido de forma aditiva con `SolicitanteEvaluacionNoEncontradoException` (`HTTP 404`, código `SOLICITANTE_NO_ENCONTRADO`, tipo propio de `evaluations` distinto del homónimo de `applicants`, mismo criterio que HU05 con `ReglaScoringVariableNoEncontradaException`/`VariableRiesgoNoEncontradaException`) y `NivelEndeudamientoIndeterminadoException` (`HTTP 409`, código `NIVEL_ENDEUDAMIENTO_INDETERMINADO`).
+  * `CalcularScoreRequest` valida "exactamente uno de `idSolicitante`/`numeroDocumento`" mediante `@AssertTrue` (reutiliza el mecanismo existente de `MethodArgumentNotValidException` → `HTTP 400 VALIDATION_ERROR`, sin código nuevo en el manejador global).
+  * Respuesta (`EvaluacionResponse`/`DetalleEvaluacionResponse`) limitada a `idEvaluacion`, `idSolicitante`, `fechaEvaluacion`, `scoreTotal` y, por detalle, `idRegla`/`operadorAplicado`/`valorCondicionAplicado`/`condicionCumplida`/`puntajeObtenido`; no expone datos financieros del solicitante.
+  * `EvaluacionController` documentado con las mismas convenciones springdoc/`@Operation`/`@ApiResponses` ya usadas en `ReglaScoringController`; no existe (ni se creó) un contrato OpenAPI estático versionado independiente.
+  * Gherkin: `docs/quality/HU07-calcular-score-crediticio.feature` (incluye el escenario de D8 marcado `@pendiente-decision-negocio` ya resuelto por la decisión aprobada).
+  * No se implementó autenticación, autorización, RBAC, usuarios ni Spring Security (RF14/RNF02 documentados como dependencia funcional futura, igual que en HU01-HU06). No se agregó `INACTIVA` a `regla_scoring`. No se modificaron `pom.xml`, `.github/workflows/ci.yml`, `CLAUDE.md`, `feature-list.json`, `CreditScoringEngineApplication.java` ni las migraciones V1-V4.
+* **Pruebas**:
+  * Dominio: `OperadorScoringTest`/`ReglaScoringTest` extendidos con pruebas de `comparar`/`evaluar` por cada operador y tipo de variable; nuevos `EvaluacionTest`, `DetalleEvaluacionTest` (incluida la invariante de consistencia de `puntajeObtenido`) y `ValorVariableResolverTest` (fórmula D1, bloqueo D8, validación defensiva RF05).
+  * Aplicación: `CalcularScoreServiceTest` (identificación por ID/documento, solicitante inexistente, sin variables activas, variable activa sin reglas, múltiples reglas cumplidas/no cumplidas, resolución perezosa del valor real solo para variables con reglas vigentes, propagación de `NivelEndeudamientoIndeterminadoException` sin persistir, `idSolicitante` correcto al guardar) y `CalcularScoreRequestValidationTest` (exactamente uno de los dos identificadores).
+  * Adaptadores de traducción: `SolicitanteConsultaAdapterTest`, `VariablesActivasConsultaAdapterTest`, `ReglasScoringConsultaAdapterTest` (numérica, categórica, cumplida/no cumplida).
+  * Controlador: `EvaluacionControllerTest` (201, 400 por ambos/ningún identificador y formato inválido, 404, 409, 500 genérico sin exponer detalles, `X-Trace-Id`).
+  * Integración de persistencia contra PostgreSQL local real (`EvaluacionRepositoryAdapterIT`, perfil `it`): generación de IDs y `fechaEvaluacion`, persistencia de todos los detalles con su snapshot, preservación histórica tras editar la regla original (usando el mismo `EntityManager`/transacción de la prueba para evitar el autobloqueo por el lock `FOR KEY SHARE` que una FK entrante mantiene sobre `regla_scoring` hasta el fin de la transacción), y rechazo por FK inexistente verificando además que la evaluación no queda visible para otra conexión (atomicidad). 5/5 pruebas, sin fallos.
+  * Suite completa ejecutada con `./mvnw.cmd test`: 264 pruebas, sin fallos.
+* **Observaciones**:
+  * Durante la implementación se detectaron y corrigieron tres problemas reales en el fixture de `EvaluacionRepositoryAdapterIT` (no en el código de producción): un autobloqueo (self-deadlock) entre dos conexiones JDBC de la misma prueba por un lock `FOR KEY SHARE` de PostgreSQL sobre una fila de `regla_scoring` referenciada por FK, y dos colisiones de la restricción `UNIQUE` de `regla_scoring` por sufijos de unicidad (`System.nanoTime() % 1000`) con muy poca entropía frente a una base de datos real persistente entre ejecuciones.
+  * `feature-list.json` también tiene a HU05 y HU06 marcadas como `pending` pese a estar ya fusionadas en `main` según el historial de git; no se modificó por estar fuera del alcance autorizado para esta actualización (solo `claude-progress.md`).
+  * Pendiente de autorización explícita: commit y push (no realizados).

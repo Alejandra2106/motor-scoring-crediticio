@@ -242,6 +242,84 @@ class ReglaScoringTest {
     }
 
     @Test
+    void evaluarIgualDebeCumplirseCuandoElValorRealCoincideConLaCondicion() {
+        ReglaScoring regla = ReglaScoring.reconstruir(
+                1L, 1L, OperadorScoring.IGUAL, "5000000", 20, EstadoReglaScoring.ACTIVA, null);
+
+        assertThat(regla.evaluar("5000000", TipoVariable.NUMERICO)).isTrue();
+    }
+
+    @Test
+    void evaluarMayorDebeCumplirseCuandoElValorRealSuperaLaCondicion() {
+        ReglaScoring regla = ReglaScoring.reconstruir(
+                1L, 1L, OperadorScoring.MAYOR, "5000000", 20, EstadoReglaScoring.ACTIVA, null);
+
+        assertThat(regla.evaluar("6000000", TipoVariable.NUMERICO)).isTrue();
+        assertThat(regla.evaluar("5000000", TipoVariable.NUMERICO)).isFalse();
+    }
+
+    @Test
+    void evaluarMayorOIgualDebeCumplirseParaValorRealIgualOMayor() {
+        ReglaScoring regla = ReglaScoring.reconstruir(
+                1L, 1L, OperadorScoring.MAYOR_O_IGUAL, "5000000", 20, EstadoReglaScoring.ACTIVA, null);
+
+        assertThat(regla.evaluar("5000000", TipoVariable.NUMERICO)).isTrue();
+        assertThat(regla.evaluar("4999999", TipoVariable.NUMERICO)).isFalse();
+    }
+
+    @Test
+    void evaluarMenorDebeCumplirseCuandoElValorRealEsMenorQueLaCondicion() {
+        ReglaScoring regla = ReglaScoring.reconstruir(
+                1L, 1L, OperadorScoring.MENOR, "5000000", 20, EstadoReglaScoring.ACTIVA, null);
+
+        assertThat(regla.evaluar("4000000", TipoVariable.NUMERICO)).isTrue();
+        assertThat(regla.evaluar("5000000", TipoVariable.NUMERICO)).isFalse();
+    }
+
+    @Test
+    void evaluarMenorOIgualDebeCumplirseParaValorRealIgualOMenor() {
+        ReglaScoring regla = ReglaScoring.reconstruir(
+                1L, 1L, OperadorScoring.MENOR_O_IGUAL, "5000000", 20, EstadoReglaScoring.ACTIVA, null);
+
+        assertThat(regla.evaluar("5000000", TipoVariable.NUMERICO)).isTrue();
+        assertThat(regla.evaluar("5000001", TipoVariable.NUMERICO)).isFalse();
+    }
+
+    @Test
+    void evaluarDebeSerFalsoCuandoLaCondicionNumericaNoSeCumple() {
+        ReglaScoring regla = ReglaScoring.reconstruir(
+                1L, 1L, OperadorScoring.MAYOR_O_IGUAL, "5000000", 20, EstadoReglaScoring.ACTIVA, null);
+
+        assertThat(regla.evaluar("4999999", TipoVariable.NUMERICO)).isFalse();
+    }
+
+    @Test
+    void evaluarDebeCompararNumericamenteSinImportarElFormatoDelTexto() {
+        ReglaScoring regla = ReglaScoring.reconstruir(
+                1L, 1L, OperadorScoring.IGUAL, "5000000", 20, EstadoReglaScoring.ACTIVA, null);
+
+        assertThat(regla.evaluar("5000000.00", TipoVariable.NUMERICO)).isTrue();
+    }
+
+    @Test
+    void evaluarDebeCumplirseParaVariableCategoricaCuandoElValorRealCoincide() {
+        ReglaScoring regla = ReglaScoring.reconstruir(
+                4L, 4L, OperadorScoring.IGUAL, "BUENO", 30, EstadoReglaScoring.ACTIVA, null);
+
+        assertThat(regla.evaluar("BUENO", TipoVariable.CATEGORICO)).isTrue();
+        assertThat(regla.evaluar("REGULAR", TipoVariable.CATEGORICO)).isFalse();
+    }
+
+    @Test
+    void evaluarDebeRechazarValorRealNulo() {
+        ReglaScoring regla = ReglaScoring.reconstruir(
+                1L, 1L, OperadorScoring.IGUAL, "10", 20, EstadoReglaScoring.ACTIVA, null);
+
+        assertThatThrownBy(() -> regla.evaluar(null, TipoVariable.NUMERICO))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
     void reconstruirDebePreservarTodosLosCampos() {
         LocalDateTime fechaCreacion = LocalDateTime.of(2026, 1, 1, 10, 0);
 

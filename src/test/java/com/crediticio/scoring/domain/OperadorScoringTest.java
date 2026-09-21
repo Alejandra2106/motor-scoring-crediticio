@@ -38,4 +38,39 @@ class OperadorScoringTest {
         assertThat(OperadorScoring.MENOR.esSoloIgualdad()).isFalse();
         assertThat(OperadorScoring.MENOR_O_IGUAL.esSoloIgualdad()).isFalse();
     }
+
+    @Test
+    void compararIgualDebeCumplirseUnicamenteCuandoElResultadoEsCero() {
+        assertThat(OperadorScoring.IGUAL.comparar(0)).isTrue();
+        assertThat(OperadorScoring.IGUAL.comparar(1)).isFalse();
+        assertThat(OperadorScoring.IGUAL.comparar(-1)).isFalse();
+    }
+
+    @Test
+    void compararMayorDebeCumplirseUnicamenteCuandoElResultadoEsPositivo() {
+        assertThat(OperadorScoring.MAYOR.comparar(1)).isTrue();
+        assertThat(OperadorScoring.MAYOR.comparar(0)).isFalse();
+        assertThat(OperadorScoring.MAYOR.comparar(-1)).isFalse();
+    }
+
+    @Test
+    void compararMayorOIgualDebeCumplirseParaResultadosNoNegativos() {
+        assertThat(OperadorScoring.MAYOR_O_IGUAL.comparar(1)).isTrue();
+        assertThat(OperadorScoring.MAYOR_O_IGUAL.comparar(0)).isTrue();
+        assertThat(OperadorScoring.MAYOR_O_IGUAL.comparar(-1)).isFalse();
+    }
+
+    @Test
+    void compararMenorDebeCumplirseUnicamenteCuandoElResultadoEsNegativo() {
+        assertThat(OperadorScoring.MENOR.comparar(-1)).isTrue();
+        assertThat(OperadorScoring.MENOR.comparar(0)).isFalse();
+        assertThat(OperadorScoring.MENOR.comparar(1)).isFalse();
+    }
+
+    @Test
+    void compararMenorOIgualDebeCumplirseParaResultadosNoPositivos() {
+        assertThat(OperadorScoring.MENOR_O_IGUAL.comparar(-1)).isTrue();
+        assertThat(OperadorScoring.MENOR_O_IGUAL.comparar(0)).isTrue();
+        assertThat(OperadorScoring.MENOR_O_IGUAL.comparar(1)).isFalse();
+    }
 }

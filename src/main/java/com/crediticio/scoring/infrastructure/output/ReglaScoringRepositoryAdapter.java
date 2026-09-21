@@ -1,5 +1,6 @@
 package com.crediticio.scoring.infrastructure.output;
 
+import com.crediticio.scoring.domain.EstadoReglaScoring;
 import com.crediticio.scoring.domain.OperadorScoring;
 import com.crediticio.scoring.domain.ReglaScoring;
 import com.crediticio.scoring.domain.ReglaScoringDuplicadaException;
@@ -10,6 +11,8 @@ import jakarta.persistence.PersistenceContext;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 @Component
@@ -54,6 +57,13 @@ public class ReglaScoringRepositoryAdapter implements ReglaScoringRepositoryPort
     @Override
     public Optional<ReglaScoring> buscarPorId(Long idRegla) {
         return reglaScoringJpaRepository.findById(idRegla).map(this::aDominio);
+    }
+
+    @Override
+    public List<ReglaScoring> listarActivasPorRiesgos(Collection<Long> idsRiesgo) {
+        return reglaScoringJpaRepository.findByIdRiesgoInAndEstado(idsRiesgo, EstadoReglaScoring.ACTIVA).stream()
+                .map(this::aDominio)
+                .toList();
     }
 
     private ReglaScoringJpaEntity actualizarEntidadExistente(ReglaScoring reglaScoring) {
