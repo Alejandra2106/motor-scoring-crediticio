@@ -163,12 +163,42 @@
 
 ### HU05 - Crear regla de scoring
 
-* **Estado**: PENDIENTE
-* **Descripción breve**: Crear una nueva regla de scoring asociada a variables de riesgo.
-* **Criterios de aceptación**: pendiente de documentar.
-* **Implementación**: pendiente.
-* **Pruebas**: pendiente.
-* **Observaciones**: ninguna.
+* **Estado**: COMPLETADA
+* **Descripción breve**: Crear una nueva regla de scoring asociada a una variable de riesgo activa, estableciendo una condición (operador y valor) y un puntaje entre -100 y 100, para que quede disponible para el cálculo futuro del score crediticio. No implementa el cálculo del score ni la ejecución de reglas.
+* **Criterios de aceptación**:
+  * Recibir `idRiesgo`, `operador`, `valorCondicion` y `puntaje`; rechazar la creación si `idRiesgo` no corresponde a una variable de riesgo registrada (`HTTP 404`) o si esa variable está `INACTIVA` (`HTTP 409`).
+  * Permitir únicamente los operadores `=`, `>`, `>=`, `<`, `<=`, restringidos a `=` cuando la variable asociada es categórica (`HISTORIAL_CREDITICIO`).
+  * Validar `valorCondicion` según el tipo de la variable: numérico ≥ 0 (entero para `NUMERO_MORAS`, con decimales permitidos para las demás variables numéricas) o, para `HISTORIAL_CREDITICIO`, únicamente `BUENO`, `REGULAR` o `MALO`.
+  * Validar `puntaje` como entero obligatorio entre -100 y 100 (aporte individual de la regla, no el score final).
+  * Rechazar una regla duplicada por la combinación `idRiesgo + operador + valorCondicion` (`HTTP 409`), verificado tanto en la aplicación como mediante restricción `UNIQUE` en PostgreSQL.
+  * Generar automáticamente `idRegla` y crear la regla en estado `ACTIVA`.
+  * Persistir la regla únicamente tras superar todas las validaciones, de forma transaccional.
+  * Retornar `HTTP 201` con `idRegla`, `idRiesgo`, `operador`, `valorCondicion` y `puntaje`.
+* **Implementación**:
+  * Endpoint `POST /api/v1/reglas-scoring` para crear reglas de scoring.
+  * Nuevo módulo `scoring`, organizado con Package by Feature y Ports & Adapters, siguiendo el mismo patrón ya usado en `riskvariables`.
+  * Enum de dominio `OperadorScoring` (serializado por su símbolo vía `@JsonCreator`/`@JsonValue`, igual convención de contrato JSON que los enums existentes) y `EstadoReglaScoring` (únicamente `ACTIVA` en esta HU, mismo criterio ya aplicado en `EstadoVariableRiesgo` en HU03).
+  * Entidad de dominio `ReglaScoring` (sin dependencias de Spring ni JPA), responsable de validar la compatibilidad operador/tipo, el formato y rango de `valorCondicion` según el tipo de variable, y el rango de `puntaje`.
+  * **Frontera entre módulos**: `scoring.domain` y `scoring.application` no importan ninguna clase de dominio ni el puerto de persistencia de `riskvariables`. Para RF01/RF02/RF05 se definió un puerto propio, `ConsultarVariableRiesgoPort` (con la proyección mínima `VariableRiesgoConsultada` y el enum propio `TipoVariable`), implementado por `VariableRiesgoConsultaAdapter` — el único componente de `scoring` que conoce el modelo de `riskvariables`, y que reutiliza internamente `VariableRiesgoRepositoryPort` ya existente sin duplicar persistencia. Decisión aprobada explícitamente por María Alejandra tras comparación de alternativas (ver historial de la conversación de HU05).
+  * `CrearReglaScoringUseCase` / `CrearReglaScoringService` (`@Transactional`), que consulta la variable asociada, valida su existencia y estado, construye la regla de dominio y verifica la unicidad antes de persistir.
+  * Puerto de salida `ReglaScoringRepositoryPort` y adaptador de persistencia mediante JPA (`ReglaScoringRepositoryAdapter`), que traduce una violación de integridad de PostgreSQL a `ReglaScoringDuplicadaException`. `id_riesgo` se persiste como columna simple (sin relación JPA `@ManyToOne` hacia `riskvariables`), preservando la misma frontera entre módulos también a nivel de persistencia.
+  * Migración `V4__create_regla_scoring_table.sql`: tabla `regla_scoring` con `id_regla`, `id_riesgo` (FK hacia `riesgo`), `operador` (`CHECK` contra los cinco símbolos permitidos), `valor_condicion` (`VARCHAR`, validado en el dominio), `puntaje` (`CHECK BETWEEN -100 AND 100`), `estado` (`CHECK (estado = 'ACTIVA')`, mismo criterio que `V2` de `riesgo`), `fecha_creacion` y restricción `UNIQUE (id_riesgo, operador, valor_condicion)`.
+  * `GlobalExceptionHandler` extendido de forma aditiva con el manejo de `ReglaScoringVariableNoEncontradaException` (`HTTP 404`), `ReglaScoringVariableInactivaException` (`HTTP 409`) y `ReglaScoringDuplicadaException` (`HTTP 409`).
+  * No se implementó autenticación, autorización, usuarios ni roles. RF19/RNF01 quedan documentados como dependencia funcional futura, igual que en HU01/HU03/HU04. No se persiste ningún campo de usuario creador (RNF05 cubierto únicamente con `fecha_creacion`).
+* **Pruebas**:
+  * Pruebas unitarias de dominio (`ReglaScoringTest`, `OperadorScoringTest`): estado inicial `ACTIVA`, compatibilidad operador/tipo, validación numérica (incluyendo el caso especial entero de `NUMERO_MORAS`), validación categórica de `HISTORIAL_CREDITICIO`, rango de `puntaje`, reconstrucción.
+  * Pruebas unitarias del adaptador de consulta cruzada (`VariableRiesgoConsultaAdapterTest`): mapeo de existencia, estado, tipo y `permiteDecimales` desde el dominio de `riskvariables` hacia la proyección propia de `scoring`.
+  * Pruebas de validación de Bean Validation del DTO de entrada (`CrearReglaScoringRequestValidationTest`).
+  * Pruebas unitarias del servicio de aplicación (`CrearReglaScoringServiceTest`): creación exitosa, variable inexistente, variable inactiva, regla duplicada, validación de dominio propagada.
+  * Pruebas de controlador mediante MockMvc (`ReglaScoringControllerTest`): 201 con los cinco campos aprobados, 400 por datos inválidos, 404 por variable inexistente, 409 por variable inactiva y por duplicado, 500 genérico sin exponer detalles internos.
+  * Prueba de integración de persistencia contra PostgreSQL local real (`ReglaScoringRepositoryAdapterIT`, perfil `it`): generación de `idRegla` y `fechaCreacion`, lectura de todos los campos, restricción `UNIQUE` de la combinación, `existeCombinacion`, y verificación mediante SQL nativo de que las restricciones `CHECK` de `operador` y `puntaje` y la `FK` hacia `riesgo` viven en la base de datos. La fixture de variables de riesgo usa un upsert idempotente (`ON CONFLICT ... DO UPDATE`) en vez de inserciones fijas, para convivir de forma segura con datos reales ya existentes en la base local (la tabla `riesgo` admite como máximo una fila por variable).
+  * Suite completa ejecutada con `./mvnw.cmd clean test`: 162 pruebas, sin fallos.
+  * Prueba de integración ejecutada manualmente contra PostgreSQL local (`-Dtest=ReglaScoringRepositoryAdapterIT -Dspring.profiles.active=it`): 8 pruebas, sin fallos. Flyway validó 4 migraciones y Hibernate `ddl-auto=validate` no reportó incompatibilidades.
+  * Gherkin: `docs/quality/HU05-crear-regla-scoring.feature`.
+* **Observaciones**:
+  * RF19 y RNF01 relacionados con la autorización del Administrador de riesgo quedan fuera del alcance de HU05 y serán implementados mediante la HU de autenticación/autorización futura, siguiendo el mismo criterio ya aplicado en HU01/HU03/HU04.
+  * El rango de `puntaje` (-100 a 100, inclusive) fue aprobado explícitamente por María Alejandra como aporte individual de una regla, no como rango del score final del sistema.
+  * El mecanismo de comunicación entre `scoring` y `riskvariables` (puerto propio `ConsultarVariableRiesgoPort` + adaptador de traducción, en vez de reutilizar directamente el puerto interno de `riskvariables`) fue evaluado explícitamente comparando ambas alternativas contra SOLID/GRASP y aprobado como precedente para futuras dependencias entre módulos de negocio (por ejemplo, HU07 "Calcular score crediticio").
 
 ### HU06 - Editar regla de scoring
 
