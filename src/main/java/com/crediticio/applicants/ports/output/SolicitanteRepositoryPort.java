@@ -11,4 +11,6 @@ public interface SolicitanteRepositoryPort {
     boolean existePorNumeroDocumento(String numeroDocumento);
 
     Optional<Solicitante> buscarPorNumeroDocumento(String numeroDocumento);
+
+    Optional<Solicitante> buscarPorId(Long idSolicitante);
 }

@@ -35,4 +35,19 @@ public enum OperadorScoring {
     public boolean esSoloIgualdad() {
         return this == IGUAL;
     }
+
+    /**
+     * Interpreta el resultado de un {@code compareTo} entre el valor real y el valor de
+     * condición según la semántica de este operador (p. ej. para {@code MAYOR}, cumple
+     * cuando el valor real es mayor que la condición).
+     */
+    public boolean comparar(int resultadoComparacion) {
+        return switch (this) {
+            case IGUAL -> resultadoComparacion == 0;
+            case MAYOR -> resultadoComparacion > 0;
+            case MAYOR_O_IGUAL -> resultadoComparacion >= 0;
+            case MENOR -> resultadoComparacion < 0;
+            case MENOR_O_IGUAL -> resultadoComparacion <= 0;
+        };
+    }
 }

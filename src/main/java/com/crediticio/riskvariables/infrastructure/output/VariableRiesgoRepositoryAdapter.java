@@ -1,5 +1,6 @@
 package com.crediticio.riskvariables.infrastructure.output;
 
+import com.crediticio.riskvariables.domain.EstadoVariableRiesgo;
 import com.crediticio.riskvariables.domain.NombreVariableRiesgo;
 import com.crediticio.riskvariables.domain.VariableRiesgo;
 import com.crediticio.riskvariables.domain.VariableRiesgoDuplicadaException;
@@ -11,6 +12,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Component
@@ -47,6 +49,13 @@ public class VariableRiesgoRepositoryAdapter implements VariableRiesgoRepository
     @Override
     public Optional<VariableRiesgo> buscarPorId(Long idVariableRiesgo) {
         return variableRiesgoJpaRepository.findById(idVariableRiesgo).map(this::aDominio);
+    }
+
+    @Override
+    public List<VariableRiesgo> listarActivas() {
+        return variableRiesgoJpaRepository.findByEstado(EstadoVariableRiesgo.ACTIVA).stream()
+                .map(this::aDominio)
+                .toList();
     }
 
     private VariableRiesgoJpaEntity actualizarEntidadExistente(VariableRiesgo variableRiesgo) {

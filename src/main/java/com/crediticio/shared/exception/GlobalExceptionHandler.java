@@ -2,6 +2,8 @@ package com.crediticio.shared.exception;
 
 import com.crediticio.applicants.domain.DocumentoDuplicadoException;
 import com.crediticio.applicants.domain.SolicitanteNoEncontradoException;
+import com.crediticio.evaluations.domain.NivelEndeudamientoIndeterminadoException;
+import com.crediticio.evaluations.domain.SolicitanteEvaluacionNoEncontradoException;
 import com.crediticio.riskvariables.domain.VariableRiesgoDuplicadaException;
 import com.crediticio.riskvariables.domain.VariableRiesgoNoEncontradaException;
 import com.crediticio.scoring.domain.ReglaScoringDuplicadaException;
@@ -97,6 +99,18 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> manejarReglaScoringNoEncontrada(ReglaScoringNoEncontradaException ex) {
         log.warn("Operación sobre una regla de scoring que no existe");
         return construirRespuesta(HttpStatus.NOT_FOUND, "REGLA_SCORING_NO_ENCONTRADA", ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(SolicitanteEvaluacionNoEncontradoException.class)
+    public ResponseEntity<ApiError> manejarSolicitanteEvaluacionNoEncontrado(SolicitanteEvaluacionNoEncontradoException ex) {
+        log.warn("Cálculo de score sobre un solicitante que no existe");
+        return construirRespuesta(HttpStatus.NOT_FOUND, "SOLICITANTE_NO_ENCONTRADO", ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(NivelEndeudamientoIndeterminadoException.class)
+    public ResponseEntity<ApiError> manejarNivelEndeudamientoIndeterminado(NivelEndeudamientoIndeterminadoException ex) {
+        log.warn("Cálculo de score bloqueado por NIVEL_ENDEUDAMIENTO indeterminado (ingresos mensuales en cero)");
+        return construirRespuesta(HttpStatus.CONFLICT, "NIVEL_ENDEUDAMIENTO_INDETERMINADO", ex.getMessage(), List.of());
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
