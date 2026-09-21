@@ -5,4 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface ReglaScoringJpaRepository extends JpaRepository<ReglaScoringJpaEntity, Long> {
 
     boolean existsByIdRiesgoAndOperadorAndValorCondicion(Long idRiesgo, String operador, String valorCondicion);
+
+    boolean existsByIdRiesgoAndOperadorAndValorCondicionAndIdReglaNot(Long idRiesgo, String operador,
+            String valorCondicion, Long idRegla);
 }

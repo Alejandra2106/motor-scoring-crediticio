@@ -80,4 +80,16 @@ public class ReglaScoringJpaEntity {
     public LocalDateTime getFechaCreacion() {
         return fechaCreacion;
     }
+
+    public void setOperador(String operador) {
+        this.operador = operador;
+    }
+
+    public void setValorCondicion(String valorCondicion) {
+        this.valorCondicion = valorCondicion;
+    }
+
+    public void setPuntaje(Integer puntaje) {
+        this.puntaje = puntaje;
+    }
 }

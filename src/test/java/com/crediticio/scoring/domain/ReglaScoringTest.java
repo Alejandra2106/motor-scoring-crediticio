@@ -174,6 +174,74 @@ class ReglaScoringTest {
     }
 
     @Test
+    void editarDebeActualizarOperadorValorCondicionYPuntajePreservandoIdReglaIdRiesgoEstadoYFechaCreacion() {
+        LocalDateTime fechaCreacion = LocalDateTime.of(2026, 1, 1, 10, 0);
+        ReglaScoring reglaExistente = ReglaScoring.reconstruir(
+                7L, 1L, OperadorScoring.MAYOR_O_IGUAL, "3000000", 20, EstadoReglaScoring.ACTIVA, fechaCreacion);
+
+        ReglaScoring editada = reglaExistente.editar(OperadorScoring.MENOR, "5000000", 25, TipoVariable.NUMERICO, true);
+
+        assertThat(editada.getIdRegla()).isEqualTo(7L);
+        assertThat(editada.getIdRiesgo()).isEqualTo(1L);
+        assertThat(editada.getOperador()).isEqualTo(OperadorScoring.MENOR);
+        assertThat(editada.getValorCondicion()).isEqualTo("5000000");
+        assertThat(editada.getPuntaje()).isEqualTo(25);
+        assertThat(editada.getEstado()).isEqualTo(EstadoReglaScoring.ACTIVA);
+        assertThat(editada.getFechaCreacion()).isEqualTo(fechaCreacion);
+    }
+
+    @Test
+    void editarDebePermitirConservarLaMismaCombinacionOriginal() {
+        ReglaScoring reglaExistente = ReglaScoring.reconstruir(
+                7L, 1L, OperadorScoring.MAYOR_O_IGUAL, "3000000", 20, EstadoReglaScoring.ACTIVA, null);
+
+        ReglaScoring editada = reglaExistente.editar(OperadorScoring.MAYOR_O_IGUAL, "3000000", 20,
+                TipoVariable.NUMERICO, true);
+
+        assertThat(editada.getOperador()).isEqualTo(OperadorScoring.MAYOR_O_IGUAL);
+        assertThat(editada.getValorCondicion()).isEqualTo("3000000");
+    }
+
+    @Test
+    void editarDebeRechazarOperadorIncompatibleConVariableCategorica() {
+        ReglaScoring reglaExistente = ReglaScoring.reconstruir(
+                4L, 4L, OperadorScoring.IGUAL, "BUENO", 30, EstadoReglaScoring.ACTIVA, null);
+
+        assertThatThrownBy(() -> reglaExistente.editar(OperadorScoring.MAYOR, "BUENO", 30, TipoVariable.CATEGORICO, false))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void editarDebeRechazarValorCondicionNoNumericoParaVariableNumerica() {
+        ReglaScoring reglaExistente = ReglaScoring.reconstruir(
+                1L, 1L, OperadorScoring.IGUAL, "10", 20, EstadoReglaScoring.ACTIVA, null);
+
+        assertThatThrownBy(() -> reglaExistente.editar(OperadorScoring.IGUAL, "ABC", 20, TipoVariable.NUMERICO, true))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void editarDebeRechazarValorCategoricoFueraDelCatalogoPermitido() {
+        ReglaScoring reglaExistente = ReglaScoring.reconstruir(
+                4L, 4L, OperadorScoring.IGUAL, "BUENO", 30, EstadoReglaScoring.ACTIVA, null);
+
+        assertThatThrownBy(() -> reglaExistente.editar(OperadorScoring.IGUAL, "EXCELENTE", 30,
+                TipoVariable.CATEGORICO, false))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {-101, 101})
+    void editarDebeRechazarPuntajeFueraDelRangoPermitido(int puntajeInvalido) {
+        ReglaScoring reglaExistente = ReglaScoring.reconstruir(
+                1L, 1L, OperadorScoring.IGUAL, "10", 20, EstadoReglaScoring.ACTIVA, null);
+
+        assertThatThrownBy(() -> reglaExistente.editar(OperadorScoring.IGUAL, "10", puntajeInvalido,
+                TipoVariable.NUMERICO, true))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void reconstruirDebePreservarTodosLosCampos() {
         LocalDateTime fechaCreacion = LocalDateTime.of(2026, 1, 1, 10, 0);
 
