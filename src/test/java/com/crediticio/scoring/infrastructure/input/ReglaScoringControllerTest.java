@@ -1,12 +1,15 @@
 package com.crediticio.scoring.infrastructure.input;
 
 import com.crediticio.scoring.application.dto.CrearReglaScoringRequest;
+import com.crediticio.scoring.application.dto.EditarReglaScoringRequest;
 import com.crediticio.scoring.application.dto.ReglaScoringResponse;
 import com.crediticio.scoring.domain.OperadorScoring;
 import com.crediticio.scoring.domain.ReglaScoringDuplicadaException;
+import com.crediticio.scoring.domain.ReglaScoringNoEncontradaException;
 import com.crediticio.scoring.domain.ReglaScoringVariableInactivaException;
 import com.crediticio.scoring.domain.ReglaScoringVariableNoEncontradaException;
 import com.crediticio.scoring.ports.input.CrearReglaScoringUseCase;
+import com.crediticio.scoring.ports.input.EditarReglaScoringUseCase;
 import com.crediticio.shared.exception.GlobalExceptionHandler;
 import com.crediticio.shared.util.TraceIdFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,9 +24,11 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -40,6 +45,9 @@ class ReglaScoringControllerTest {
 
     @MockitoBean
     private CrearReglaScoringUseCase crearReglaScoringUseCase;
+
+    @MockitoBean
+    private EditarReglaScoringUseCase editarReglaScoringUseCase;
 
     @Test
     void debeRetornar201YExactamenteLosCincoCamposAprobadosCuandoLaCreacionEsExitosa() throws Exception {
@@ -268,6 +276,110 @@ class ReglaScoringControllerTest {
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.errorCode").value("INTERNAL_ERROR"))
                 .andExpect(jsonPath("$.stackTrace").doesNotExist());
+    }
+
+    @Test
+    void debeRetornar200ConLosCincoCamposActualizadosCuandoLaEdicionEsExitosa() throws Exception {
+        EditarReglaScoringRequest request = solicitudEdicionValida();
+        ReglaScoringResponse response = new ReglaScoringResponse(7L, 1L, OperadorScoring.MENOR, "5000000", 25);
+        when(editarReglaScoringUseCase.editar(eq(7L), any(EditarReglaScoringRequest.class))).thenReturn(response);
+
+        mockMvc.perform(patch("/api/v1/reglas-scoring/7")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(header().exists("X-Trace-Id"))
+                .andExpect(jsonPath("$.idRegla").value(7))
+                .andExpect(jsonPath("$.idRiesgo").value(1))
+                .andExpect(jsonPath("$.operador").value("<"))
+                .andExpect(jsonPath("$.valorCondicion").value("5000000"))
+                .andExpect(jsonPath("$.puntaje").value(25));
+    }
+
+    @Test
+    void debeRetornar400CuandoFaltaElOperadorAlEditar() throws Exception {
+        String payloadSinOperador = """
+                {
+                  "valorCondicion": "5000000",
+                  "puntaje": 25
+                }
+                """;
+
+        mockMvc.perform(patch("/api/v1/reglas-scoring/7")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payloadSinOperador))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.stackTrace").doesNotExist());
+    }
+
+    @Test
+    void debeRetornar400CuandoElPuntajeAlEditarTieneNotacionDecimal() throws Exception {
+        String payloadConPuntajeDecimal = """
+                {
+                  "operador": ">=",
+                  "valorCondicion": "5000000",
+                  "puntaje": 20.5
+                }
+                """;
+
+        mockMvc.perform(patch("/api/v1/reglas-scoring/7")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payloadConPuntajeDecimal))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
+
+        verify(editarReglaScoringUseCase, never()).editar(any(Long.class), any(EditarReglaScoringRequest.class));
+    }
+
+    @Test
+    void debeRetornar404CuandoLaReglaDeScoringNoExiste() throws Exception {
+        when(editarReglaScoringUseCase.editar(eq(999L), any(EditarReglaScoringRequest.class)))
+                .thenThrow(new ReglaScoringNoEncontradaException());
+
+        mockMvc.perform(patch("/api/v1/reglas-scoring/999")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(solicitudEdicionValida())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("REGLA_SCORING_NO_ENCONTRADA"))
+                .andExpect(jsonPath("$.stackTrace").doesNotExist());
+    }
+
+    @Test
+    void debeRetornar409CuandoLaVariableAsociadaEstaInactivaAlEditar() throws Exception {
+        when(editarReglaScoringUseCase.editar(eq(7L), any(EditarReglaScoringRequest.class)))
+                .thenThrow(new ReglaScoringVariableInactivaException());
+
+        mockMvc.perform(patch("/api/v1/reglas-scoring/7")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(solicitudEdicionValida())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("VARIABLE_RIESGO_INACTIVA"));
+    }
+
+    @Test
+    void debeRetornar409CuandoLaEdicionDuplicaOtraReglaExistente() throws Exception {
+        when(editarReglaScoringUseCase.editar(eq(7L), any(EditarReglaScoringRequest.class)))
+                .thenThrow(new ReglaScoringDuplicadaException());
+
+        mockMvc.perform(patch("/api/v1/reglas-scoring/7")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(solicitudEdicionValida())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("REGLA_SCORING_DUPLICADA"));
+    }
+
+    @Test
+    void debeRetornar400CuandoElIdRegladNoEsNumericoAlEditar() throws Exception {
+        mockMvc.perform(patch("/api/v1/reglas-scoring/abc")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(solicitudEdicionValida())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
+    }
+
+    private EditarReglaScoringRequest solicitudEdicionValida() {
+        return new EditarReglaScoringRequest(OperadorScoring.MENOR, "5000000", 25);
     }
 
     private CrearReglaScoringRequest solicitudValida() {

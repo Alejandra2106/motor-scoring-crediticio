@@ -5,6 +5,7 @@ import com.crediticio.applicants.domain.SolicitanteNoEncontradoException;
 import com.crediticio.riskvariables.domain.VariableRiesgoDuplicadaException;
 import com.crediticio.riskvariables.domain.VariableRiesgoNoEncontradaException;
 import com.crediticio.scoring.domain.ReglaScoringDuplicadaException;
+import com.crediticio.scoring.domain.ReglaScoringNoEncontradaException;
 import com.crediticio.scoring.domain.ReglaScoringVariableInactivaException;
 import com.crediticio.scoring.domain.ReglaScoringVariableNoEncontradaException;
 import com.crediticio.shared.response.ApiError;
@@ -90,6 +91,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> manejarReglaScoringDuplicada(ReglaScoringDuplicadaException ex) {
         log.warn("Intento de creación de una regla de scoring duplicada");
         return construirRespuesta(HttpStatus.CONFLICT, "REGLA_SCORING_DUPLICADA", ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(ReglaScoringNoEncontradaException.class)
+    public ResponseEntity<ApiError> manejarReglaScoringNoEncontrada(ReglaScoringNoEncontradaException ex) {
+        log.warn("Operación sobre una regla de scoring que no existe");
+        return construirRespuesta(HttpStatus.NOT_FOUND, "REGLA_SCORING_NO_ENCONTRADA", ex.getMessage(), List.of());
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)

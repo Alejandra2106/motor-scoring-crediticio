@@ -116,6 +116,98 @@ class ReglaScoringRepositoryAdapterIT {
     }
 
     @Test
+    void debeBuscarPorIdUnaReglaExistenteYRetornarVacioSiNoExiste() throws SQLException {
+        Long idRiesgo = obtenerOAsegurarRiesgoActivo(NombreVariableRiesgo.INGRESOS_MENSUALES);
+        String valorUnico = String.valueOf(System.nanoTime() % 1000);
+        ReglaScoring guardada = reglaScoringRepositoryAdapter.guardar(
+                ReglaScoring.nueva(idRiesgo, OperadorScoring.IGUAL, valorUnico, 10, TipoVariable.NUMERICO, true));
+
+        Optional<ReglaScoring> encontrada = reglaScoringRepositoryAdapter.buscarPorId(guardada.getIdRegla());
+        Optional<ReglaScoring> noEncontrada = reglaScoringRepositoryAdapter.buscarPorId(-1L);
+
+        assertThat(encontrada).isPresent();
+        assertThat(encontrada.get().getValorCondicion()).isEqualTo(valorUnico);
+        assertThat(noEncontrada).isEmpty();
+    }
+
+    @Test
+    void debeActualizarLaReglaExistentePreservandoIdReglaIdRiesgoEstadoYFechaCreacion() throws SQLException {
+        Long idRiesgo = obtenerOAsegurarRiesgoActivo(NombreVariableRiesgo.NIVEL_ENDEUDAMIENTO);
+        String valorOriginal = String.valueOf(System.nanoTime() % 1000);
+        ReglaScoring guardada = reglaScoringRepositoryAdapter.guardar(
+                ReglaScoring.nueva(idRiesgo, OperadorScoring.MAYOR_O_IGUAL, valorOriginal, 20, TipoVariable.NUMERICO, true));
+
+        ReglaScoring editada = guardada.editar(OperadorScoring.MENOR, "0.40", 30, TipoVariable.NUMERICO, true);
+        ReglaScoring actualizada = reglaScoringRepositoryAdapter.guardar(editada);
+
+        assertThat(actualizada.getIdRegla()).isEqualTo(guardada.getIdRegla());
+        assertThat(actualizada.getIdRiesgo()).isEqualTo(idRiesgo);
+        assertThat(actualizada.getOperador()).isEqualTo(OperadorScoring.MENOR);
+        assertThat(actualizada.getValorCondicion()).isEqualTo("0.40");
+        assertThat(actualizada.getPuntaje()).isEqualTo(30);
+        assertThat(actualizada.getEstado()).isEqualTo(EstadoReglaScoring.ACTIVA);
+        assertThat(actualizada.getFechaCreacion()).isEqualTo(guardada.getFechaCreacion());
+
+        ReglaScoringJpaEntity entityLeida = reglaScoringJpaRepository.findById(guardada.getIdRegla()).orElseThrow();
+        assertThat(entityLeida.getOperador()).isEqualTo("<");
+        assertThat(entityLeida.getValorCondicion()).isEqualTo("0.40");
+        assertThat(entityLeida.getPuntaje()).isEqualTo(30);
+
+        long totalReglasConIdRegla = reglaScoringJpaRepository.count();
+        assertThat(reglaScoringJpaRepository.findById(guardada.getIdRegla())).isPresent();
+        assertThat(totalReglasConIdRegla).isGreaterThanOrEqualTo(1);
+    }
+
+    @Test
+    void existeCombinacionConExclusionDebePermitirLaMismaCombinacionDeLaPropiaRegla() throws SQLException {
+        Long idRiesgo = obtenerOAsegurarRiesgoActivo(NombreVariableRiesgo.NUMERO_MORAS);
+        String valorUnico = String.valueOf(System.nanoTime() % 1000);
+        ReglaScoring guardada = reglaScoringRepositoryAdapter.guardar(
+                ReglaScoring.nueva(idRiesgo, OperadorScoring.IGUAL, valorUnico, 5, TipoVariable.NUMERICO, false));
+
+        boolean existeExcluyendoseASiMisma = reglaScoringRepositoryAdapter.existeCombinacion(
+                idRiesgo, OperadorScoring.IGUAL, valorUnico, guardada.getIdRegla());
+
+        assertThat(existeExcluyendoseASiMisma).isFalse();
+    }
+
+    @Test
+    void existeCombinacionConExclusionDebeDetectarDuplicadoContraOtraReglaExistente() throws SQLException {
+        Long idRiesgo = obtenerOAsegurarRiesgoActivo(NombreVariableRiesgo.ANTIGUEDAD_LABORAL);
+        String valorA = String.valueOf(System.nanoTime() % 1000);
+        String valorB = String.valueOf((System.nanoTime() + 1) % 1000);
+        ReglaScoring reglaA = reglaScoringRepositoryAdapter.guardar(
+                ReglaScoring.nueva(idRiesgo, OperadorScoring.MAYOR, valorA, 15, TipoVariable.NUMERICO, true));
+        ReglaScoring reglaB = reglaScoringRepositoryAdapter.guardar(
+                ReglaScoring.nueva(idRiesgo, OperadorScoring.MAYOR, valorB, 15, TipoVariable.NUMERICO, true));
+
+        boolean editarReglaBHaciaLaCombinacionDeReglaA = reglaScoringRepositoryAdapter.existeCombinacion(
+                idRiesgo, OperadorScoring.MAYOR, valorA, reglaB.getIdRegla());
+
+        assertThat(editarReglaBHaciaLaCombinacionDeReglaA).isTrue();
+    }
+
+    @Test
+    void laBaseDeDatosDebeRechazarUnUpdateQueDuplicaOtraReglaExistente() throws SQLException {
+        // Defensa en profundidad: aunque la aplicación ya excluye la propia regla en
+        // existeCombinacion, la restricción UNIQUE de la base de datos debe seguir
+        // rechazando un UPDATE que produzca la misma combinación de otra fila.
+        Long idRiesgo = obtenerOAsegurarRiesgoActivo(NombreVariableRiesgo.NUMERO_MORAS);
+        String valorA = String.valueOf(System.nanoTime() % 1000);
+        String valorB = String.valueOf((System.nanoTime() + 1) % 1000);
+        reglaScoringRepositoryAdapter.guardar(
+                ReglaScoring.nueva(idRiesgo, OperadorScoring.IGUAL, valorA, 5, TipoVariable.NUMERICO, false));
+        ReglaScoring reglaB = reglaScoringRepositoryAdapter.guardar(
+                ReglaScoring.nueva(idRiesgo, OperadorScoring.IGUAL, valorB, 5, TipoVariable.NUMERICO, false));
+
+        ReglaScoring reglaBEditadaHaciaValorA = reglaB.editar(OperadorScoring.IGUAL, valorA, 5,
+                TipoVariable.NUMERICO, false);
+
+        assertThatThrownBy(() -> reglaScoringRepositoryAdapter.guardar(reglaBEditadaHaciaValorA))
+                .isInstanceOf(ReglaScoringDuplicadaException.class);
+    }
+
+    @Test
     void laBaseDeDatosDebeRechazarUnOperadorFueraDelConjuntoPermitidoAunSaltandoLaValidacionDeDominio() throws SQLException {
         // El dominio (OperadorScoring) jamás permitiría un símbolo fuera del enum: se inserta
         // directamente vía SQL nativo para comprobar que la restricción definitiva

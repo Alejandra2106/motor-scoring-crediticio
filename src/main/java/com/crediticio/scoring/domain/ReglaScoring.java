@@ -44,6 +44,15 @@ public class ReglaScoring {
         return new ReglaScoring(idRegla, idRiesgo, operador, valorCondicion, puntaje, estado, fechaCreacion);
     }
 
+    public ReglaScoring editar(OperadorScoring operador, String valorCondicion, Integer puntaje,
+            TipoVariable tipoVariable, boolean permiteDecimales) {
+        validarCompatibilidadOperadorTipo(operador, tipoVariable);
+        ReglaScoring editada = new ReglaScoring(idRegla, idRiesgo, operador, valorCondicion, puntaje, estado,
+                fechaCreacion);
+        validarValorSegunTipo(editada.valorCondicion, tipoVariable, permiteDecimales);
+        return editada;
+    }
+
     private static void validarCompatibilidadOperadorTipo(OperadorScoring operador, TipoVariable tipoVariable) {
         Objects.requireNonNull(tipoVariable, "tipoVariable es obligatorio");
         if (tipoVariable == TipoVariable.CATEGORICO && !operador.esSoloIgualdad()) {
