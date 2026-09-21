@@ -113,7 +113,6 @@ Característica: Calcular score crediticio
     Cuando calculo el score de un solicitante
     Entonces la respuesta incluye el encabezado X-Trace-Id con un identificador generado por el sistema
 
-  @pendiente-decision-negocio
   Escenario: Ingresos mensuales en cero con una regla activa de NIVEL_ENDEUDAMIENTO
     Dado que el solicitante tiene ingresos_mensuales igual a 0
     Y existe al menos una regla ACTIVA asociada a la variable NIVEL_ENDEUDAMIENTO
