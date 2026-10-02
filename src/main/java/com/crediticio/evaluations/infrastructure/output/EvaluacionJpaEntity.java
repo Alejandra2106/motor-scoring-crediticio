@@ -25,7 +25,7 @@ public class EvaluacionJpaEntity {
     private LocalDateTime fechaEvaluacion;
 
     protected EvaluacionJpaEntity() {
-        // requerido por JPA
+        
     }
 
     public EvaluacionJpaEntity(Long idSolicitante) {

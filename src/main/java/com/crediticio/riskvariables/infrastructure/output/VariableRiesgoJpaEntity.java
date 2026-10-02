@@ -40,7 +40,7 @@ public class VariableRiesgoJpaEntity {
     private LocalDateTime fechaModificacion;
 
     protected VariableRiesgoJpaEntity() {
-        // requerido por JPA
+        
     }
 
     public VariableRiesgoJpaEntity(NombreVariableRiesgo variable, String descripcion, EstadoVariableRiesgo estado) {

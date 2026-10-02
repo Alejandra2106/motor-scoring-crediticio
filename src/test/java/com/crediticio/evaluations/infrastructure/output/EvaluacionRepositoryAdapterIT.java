@@ -26,18 +26,18 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * Prueba de integración de persistencia contra PostgreSQL local real (no H2), siguiendo el
- * mismo patrón que {@code ReglaScoringRepositoryAdapterIT} (HU05).
- *
- * Requiere que PostgreSQL local esté disponible y que las variables de entorno DB_URL,
- * DB_USERNAME y DB_PASSWORD apunten a una base de datos accesible, usando el perfil "it"
- * (src/test/resources/application-it.properties). Flyway aplicará
- * V5__create_evaluacion_tables.sql contra esa base al iniciar el contexto.
- *
- * Al terminar en "IT" (no "Test"), Surefire no la ejecuta con `./mvnw test`.
- * Ejecución manual: ./mvnw test -Dtest=EvaluacionRepositoryAdapterIT -Dspring.profiles.active=it
- */
+
+
+
+
+
+
+
+
+
+
+
+
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("it")
@@ -113,12 +113,12 @@ class EvaluacionRepositoryAdapterIT {
                 List.of(DetalleEvaluacion.nuevo(regla.idRegla(), "<=", regla.valorCondicion(), 10, true, 10)));
         Evaluacion guardada = evaluacionRepositoryAdapter.guardar(evaluacion);
 
-        // La regla se edita después (mismo registro, HU06): el detalle histórico no debe cambiar.
-        // Se edita a través del propio EntityManager de la prueba (no una conexión JDBC aparte):
-        // el detalle recién insertado ya referencia esta fila de regla_scoring por FK, lo que
-        // mantiene un lock FOR KEY SHARE sobre ella hasta que termine la transacción de la
-        // prueba; una conexión distinta intentando el UPDATE se bloquearía indefinidamente
-        // esperando ese lock.
+        
+        
+        
+        
+        
+        
         String valorEditadoUnico = "20." + System.nanoTime();
         ReglaScoring reglaExistente = reglaScoringRepositoryAdapter.buscarPorId(regla.idRegla()).orElseThrow();
         ReglaScoring reglaEditada = reglaExistente.editar(
@@ -142,8 +142,8 @@ class EvaluacionRepositoryAdapterIT {
         assertThatThrownBy(() -> evaluacionRepositoryAdapter.guardar(evaluacion))
                 .isInstanceOf(DataIntegrityViolationException.class);
 
-        // La evaluación insertada antes del fallo del detalle no queda visible para otras
-        // conexiones: la transacción completa no se confirma (RF15/atomicidad).
+        
+        
         try (Connection connection = dataSource.getConnection();
                 PreparedStatement statement = connection.prepareStatement(
                         "SELECT COUNT(*) FROM evaluacion WHERE id_solicitante = ?")) {

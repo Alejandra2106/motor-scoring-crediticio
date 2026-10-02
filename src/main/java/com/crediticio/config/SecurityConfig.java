@@ -20,11 +20,11 @@ public class SecurityConfig {
     @Value("${app.cors.allowed-origins:http://localhost:3000}")
     private String allowedOrigins;
 
-    /**
-     * RF16 (control de acceso) queda fuera de HU01 y se implementará en una HU de
-     * seguridad posterior. Mientras tanto se permite el acceso sin autenticación
-     * para no bloquear las HU funcionales ya en desarrollo.
-     */
+    
+
+
+
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
