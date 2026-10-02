@@ -35,7 +35,7 @@ public class TraceIdFilter extends OncePerRequestFilter {
             try {
                 return UUID.fromString(traceIdRecibido).toString();
             } catch (IllegalArgumentException ex) {
-                // formato inválido: se genera uno nuevo
+                
             }
         }
         return UUID.randomUUID().toString();

@@ -9,12 +9,12 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-/**
- * Único componente de {@code evaluations} que conoce el modelo de dominio de
- * {@code riskvariables}. Traduce esa información hacia el contrato propio de
- * {@code evaluations} ({@link ConsultarVariablesActivasEvaluacionPort}), reutilizando el
- * puerto de persistencia ya existente en {@code riskvariables} sin duplicarlo.
- */
+
+
+
+
+
+
 @Component
 public class VariablesActivasConsultaAdapter implements ConsultarVariablesActivasEvaluacionPort {
 

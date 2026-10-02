@@ -159,8 +159,8 @@ class CalcularScoreServiceTest {
         when(consultarVariablesActivasPort.listarActivas()).thenReturn(List.of(
                 new VariableActivaEvaluada(1L, NombreVariableEvaluada.INGRESOS_MENSUALES),
                 new VariableActivaEvaluada(2L, NombreVariableEvaluada.NIVEL_ENDEUDAMIENTO)));
-        // Solo la variable 1 tiene reglas vigentes: NIVEL_ENDEUDAMIENTO (variable 2, sin reglas)
-        // nunca debería intentar resolverse, evitando así un bloqueo D8 innecesario.
+        
+        
         when(reglasScoringConsultaPort.idsConReglasVigentes(Set.of(1L, 2L))).thenReturn(Set.of(1L));
         when(reglasScoringConsultaPort.evaluar(Map.of(1L, "4000000"))).thenReturn(List.of(
                 new ResultadoReglaEvaluada(10L, ">=", "3000000", 20, true, 20)));
