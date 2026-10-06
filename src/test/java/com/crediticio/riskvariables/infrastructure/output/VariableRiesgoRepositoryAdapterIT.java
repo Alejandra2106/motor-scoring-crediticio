@@ -5,6 +5,8 @@ import com.crediticio.riskvariables.domain.NombreVariableRiesgo;
 import com.crediticio.riskvariables.domain.VariableRiesgo;
 import com.crediticio.riskvariables.domain.VariableRiesgoDuplicadaException;
 import com.crediticio.riskvariables.domain.VariableRiesgoNoEncontradaException;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -15,24 +17,27 @@ import org.springframework.test.context.ActiveProfiles;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * Prueba de integración de persistencia contra PostgreSQL local real (no H2).
- *
- * Requiere que PostgreSQL local esté disponible y que las variables de entorno
- * DB_URL, DB_USERNAME y DB_PASSWORD apunten a una base de datos accesible, usando
- * el perfil "it" (src/test/resources/application-it.properties). Flyway aplicará
- * V2__create_riesgo_table.sql contra esa base al iniciar el contexto.
- *
- * Al terminar en "IT" (no "Test"), Surefire no la ejecuta con `./mvnw test`.
- * Ejecución manual: ./mvnw test -Dtest=VariableRiesgoRepositoryAdapterIT -Dspring.profiles.active=it
- */
+
+
+
+
+
+
+
+
+
+
+
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("it")
@@ -47,6 +52,26 @@ class VariableRiesgoRepositoryAdapterIT {
 
     @Autowired
     private DataSource dataSource;
+
+    @BeforeEach
+    void limpiarEstadoPrevioDeVariablesDePrueba() throws SQLException {
+        limpiarVariablesDePrueba();
+    }
+
+    @AfterEach
+    void limpiarEstadoPosteriorDeVariablesDePrueba() throws SQLException {
+        limpiarVariablesDePrueba();
+    }
+
+    private String[] valoresUtilizadosPorLaClase() {
+        return new String[] {
+                NombreVariableRiesgo.INGRESOS_MENSUALES.name(),
+                NombreVariableRiesgo.NIVEL_ENDEUDAMIENTO.name(),
+                NombreVariableRiesgo.NUMERO_MORAS.name(),
+                NombreVariableRiesgo.HISTORIAL_CREDITICIO.name(),
+                NombreVariableRiesgo.ANTIGUEDAD_LABORAL.name()
+        };
+    }
 
     @Test
     void elContextoCargaConFlywayYLaValidacionDeEsquemaDeHibernate() {
@@ -98,9 +123,9 @@ class VariableRiesgoRepositoryAdapterIT {
 
     @Test
     void laBaseDeDatosDebeRechazarUnaVariableFueraDelConjuntoPermitidoAunSaltandoLaValidacionDeDominio() {
-        // El dominio (NombreVariableRiesgo) jamás permitiría un valor fuera del enum: se
-        // inserta directamente vía SQL nativo para comprobar que la restricción de integridad
-        // definitiva (ck_riesgo_variable) vive en la base de datos, no solo en la aplicación.
+        
+        
+        
         assertThatThrownBy(() -> ejecutarInsertNativo(
                 "INGRESOS_MENSUALES_INVALIDA", "Descripción válida con más de diez caracteres", "ACTIVA"))
                 .isInstanceOf(SQLException.class);
@@ -108,8 +133,8 @@ class VariableRiesgoRepositoryAdapterIT {
 
     @Test
     void laBaseDeDatosDebeRechazarUnEstadoFueraDelConjuntoPermitidoAunSaltandoLaValidacionDeDominio() {
-        // Desde HU04, ck_riesgo_estado permite ACTIVA e INACTIVA: se comprueba aquí que la
-        // restricción de integridad definitiva sigue rechazando cualquier otro valor.
+        
+        
         assertThatThrownBy(() -> ejecutarInsertNativo(
                 "NIVEL_ENDEUDAMIENTO", "Descripción válida con más de diez caracteres", "SUSPENDIDA"))
                 .isInstanceOf(SQLException.class);
@@ -120,9 +145,9 @@ class VariableRiesgoRepositoryAdapterIT {
         VariableRiesgo guardada = variableRiesgoRepositoryAdapter.guardar(
                 variableRiesgoNueva(NombreVariableRiesgo.HISTORIAL_CREDITICIO));
 
-        // El insert nativo usa una conexión JDBC ajena al rollback transaccional de
-        // @DataJpaTest (autoCommit=true), por lo que el registro insertado queda
-        // persistido de forma permanente y debe limpiarse explícitamente en el finally.
+        
+        
+        
         try {
             assertThatCode(() -> ejecutarInsertNativo(
                     "ANTIGUEDAD_LABORAL", "Descripción válida con más de diez caracteres", "INACTIVA"))
@@ -193,13 +218,88 @@ class VariableRiesgoRepositoryAdapterIT {
                 .isInstanceOf(VariableRiesgoNoEncontradaException.class);
     }
 
-    private void eliminarPorVariableNativo(String variable) throws SQLException {
+    private void limpiarVariablesDePrueba() throws SQLException {
+        for (String variable : valoresUtilizadosPorLaClase()) {
+            limpiarVariableDePrueba(variable);
+        }
+    }
+
+    private void limpiarVariableDePrueba(String variable) throws SQLException {
+        List<Long> idsRiesgo = obtenerIdsRiesgoPorVariable(variable);
+        List<Long> idsRiesgoConReglasDependientes = obtenerIdsRiesgoConReglasDependientes(idsRiesgo);
+
+        if (!idsRiesgoConReglasDependientes.isEmpty()) {
+            throw new IllegalStateException(
+                    "No es seguro limpiar la variable de prueba '" + variable + "' porque existen filas de regla_scoring " +
+                            "dependientes de los ids_riesgo " + idsRiesgoConReglasDependientes + ". " +
+                            "Este IT no registra un identificador de creación para distinguir qué regla_scoring pertenece a la prueba " +
+                            "frente a otros datos reales o de otras pruebas.");
+        }
+
         try (Connection connection = dataSource.getConnection();
                 PreparedStatement statement = connection.prepareStatement(
                         "DELETE FROM riesgo WHERE variable = ?")) {
             statement.setString(1, variable);
             statement.executeUpdate();
         }
+
+        assertThat(contarFilasPorVariable(variable)).isZero();
+    }
+
+    private List<Long> obtenerIdsRiesgoPorVariable(String variable) throws SQLException {
+        List<Long> ids = new ArrayList<>();
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(
+                        "SELECT id_riesgo FROM riesgo WHERE variable = ?")) {
+            statement.setString(1, variable);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    ids.add(resultSet.getLong("id_riesgo"));
+                }
+            }
+        }
+        return ids;
+    }
+
+    private List<Long> obtenerIdsRiesgoConReglasDependientes(List<Long> idsRiesgo) throws SQLException {
+        if (idsRiesgo.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> idsConReglas = new ArrayList<>();
+        String placeholders = String.join(", ", java.util.Collections.nCopies(idsRiesgo.size(), "?"));
+
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(
+                        "SELECT DISTINCT id_riesgo FROM regla_scoring WHERE id_riesgo IN (" + placeholders + ")")) {
+            for (int i = 0; i < idsRiesgo.size(); i++) {
+                statement.setLong(i + 1, idsRiesgo.get(i));
+            }
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    idsConReglas.add(resultSet.getLong("id_riesgo"));
+                }
+            }
+        }
+        return idsConReglas;
+    }
+
+    private int contarFilasPorVariable(String variable) throws SQLException {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(
+                        "SELECT COUNT(*) FROM riesgo WHERE variable = ?")) {
+            statement.setString(1, variable);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (resultSet.next()) {
+                    return resultSet.getInt(1);
+                }
+            }
+        }
+        return 0;
+    }
+
+    private void eliminarPorVariableNativo(String variable) throws SQLException {
+        limpiarVariableDePrueba(variable);
     }
 
     private void ejecutarInsertNativo(String variable, String descripcion, String estado) throws SQLException {

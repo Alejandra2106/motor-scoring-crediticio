@@ -123,8 +123,8 @@ class ReglaScoringControllerTest {
 
     @Test
     void debeRetornar400YNoLlegarAlCasoDeUsoCuandoElPuntajeEsElDecimalReportado() throws Exception {
-        // Reproduce exactamente el defecto reportado: Jackson truncaba "puntaje": 20.5 a 20
-        // en vez de rechazarlo (RF09 exige un entero estricto, sin truncar ni redondear).
+        
+        
         String payloadConPuntajeDecimalReportado = """
                 {
                   "idRiesgo": 109,

@@ -8,13 +8,13 @@ import org.springframework.stereotype.Component;
 
 import java.util.Optional;
 
-/**
- * Único componente de {@code evaluations} que conoce el modelo de dominio de {@code applicants}.
- * Traduce esa información hacia el contrato propio de {@code evaluations}
- * ({@link ConsultarSolicitanteEvaluacionPort}), reutilizando el puerto de persistencia ya
- * existente en {@code applicants} sin duplicarlo (mismo patrón que
- * {@code scoring.infrastructure.output.VariableRiesgoConsultaAdapter} en HU05).
- */
+
+
+
+
+
+
+
 @Component
 public class SolicitanteConsultaAdapter implements ConsultarSolicitanteEvaluacionPort {
 

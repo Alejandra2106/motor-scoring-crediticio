@@ -23,23 +23,23 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * Prueba de integración de persistencia contra PostgreSQL local real (no H2).
- *
- * Requiere que PostgreSQL local esté disponible y que las variables de entorno
- * DB_URL, DB_USERNAME y DB_PASSWORD apunten a una base de datos accesible, usando
- * el perfil "it" (src/test/resources/application-it.properties). Flyway aplicará
- * V4__create_regla_scoring_table.sql contra esa base al iniciar el contexto.
- *
- * La tabla "riesgo" solo admite un registro por NombreVariableRiesgo (UNIQUE) y puede
- * contener ya datos reales de una verificación manual anterior (HU03/HU04); por eso las
- * variables de riesgo necesarias como fixture se garantizan con un upsert idempotente
- * (obtenerOAsegurarRiesgoActivo) en vez de insertarlas siempre "en limpio", y nunca se
- * eliminan al finalizar.
- *
- * Al terminar en "IT" (no "Test"), Surefire no la ejecuta con `./mvnw test`.
- * Ejecución manual: ./mvnw test -Dtest=ReglaScoringRepositoryAdapterIT -Dspring.profiles.active=it
- */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("it")
@@ -189,9 +189,9 @@ class ReglaScoringRepositoryAdapterIT {
 
     @Test
     void laBaseDeDatosDebeRechazarUnUpdateQueDuplicaOtraReglaExistente() throws SQLException {
-        // Defensa en profundidad: aunque la aplicación ya excluye la propia regla en
-        // existeCombinacion, la restricción UNIQUE de la base de datos debe seguir
-        // rechazando un UPDATE que produzca la misma combinación de otra fila.
+        
+        
+        
         Long idRiesgo = obtenerOAsegurarRiesgoActivo(NombreVariableRiesgo.NUMERO_MORAS);
         String valorA = String.valueOf(System.nanoTime() % 1000);
         String valorB = String.valueOf((System.nanoTime() + 1) % 1000);
@@ -209,9 +209,9 @@ class ReglaScoringRepositoryAdapterIT {
 
     @Test
     void laBaseDeDatosDebeRechazarUnOperadorFueraDelConjuntoPermitidoAunSaltandoLaValidacionDeDominio() throws SQLException {
-        // El dominio (OperadorScoring) jamás permitiría un símbolo fuera del enum: se inserta
-        // directamente vía SQL nativo para comprobar que la restricción definitiva
-        // (ck_regla_scoring_operador) vive en la base de datos, no solo en la aplicación.
+        
+        
+        
         Long idRiesgo = obtenerOAsegurarRiesgoActivo(NombreVariableRiesgo.HISTORIAL_CREDITICIO);
 
         try (Connection connection = dataSource.getConnection()) {

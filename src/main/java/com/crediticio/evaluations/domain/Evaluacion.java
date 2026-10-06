@@ -4,11 +4,11 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * Evaluación de score crediticio de un solicitante. El puntaje total (RF07/CLAUDE.md §12) se
- * calcula en tiempo de uso como la suma de {@code puntajeObtenido} de sus detalles; nunca se
- * persiste como columna propia.
- */
+
+
+
+
+
 public class Evaluacion {
 
     private final Long idEvaluacion;
