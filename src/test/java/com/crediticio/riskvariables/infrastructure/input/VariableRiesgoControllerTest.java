@@ -1,5 +1,7 @@
 package com.crediticio.riskvariables.infrastructure.input;
 
+import com.crediticio.config.JwtConfig;
+import com.crediticio.config.SecurityConfig;
 import com.crediticio.riskvariables.application.dto.CambiarEstadoVariableRiesgoRequest;
 import com.crediticio.riskvariables.application.dto.CambiarEstadoVariableRiesgoResponse;
 import com.crediticio.riskvariables.application.dto.CrearVariableRiesgoRequest;
@@ -19,12 +21,18 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
+
+import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -32,11 +40,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(VariableRiesgoController.class)
-@Import({GlobalExceptionHandler.class, TraceIdFilter.class})
+@Import({GlobalExceptionHandler.class, TraceIdFilter.class, SecurityConfig.class})
 class VariableRiesgoControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    /** HU10: la cadena de seguridad real exige un JWT; aquí se simula el token ya validado con su rol. */
+    @MockitoBean
+    private JwtDecoder jwtDecoder;
+
+    private static RequestPostProcessor conRol(String rol) {
+        return jwt().jwt(token -> token.subject(UUID.randomUUID().toString()).claim(JwtConfig.CLAIM_ROL, rol))
+                .authorities(new SimpleGrantedAuthority("ROLE_" + rol));
+    }
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -54,7 +71,7 @@ class VariableRiesgoControllerTest {
                 "Ingresos mensuales netos declarados por el solicitante", EstadoVariableRiesgo.ACTIVA);
         when(crearVariableRiesgoUseCase.crear(any(CrearVariableRiesgoRequest.class))).thenReturn(response);
 
-        mockMvc.perform(post("/api/v1/variables-riesgo")
+        mockMvc.perform(post("/api/v1/variables-riesgo").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -77,7 +94,7 @@ class VariableRiesgoControllerTest {
                 }
                 """;
 
-        mockMvc.perform(post("/api/v1/variables-riesgo")
+        mockMvc.perform(post("/api/v1/variables-riesgo").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payloadInvalido))
                 .andExpect(status().isBadRequest())
@@ -97,7 +114,7 @@ class VariableRiesgoControllerTest {
                 }
                 """;
 
-        mockMvc.perform(post("/api/v1/variables-riesgo")
+        mockMvc.perform(post("/api/v1/variables-riesgo").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payloadConVariableInvalida))
                 .andExpect(status().isBadRequest())
@@ -113,7 +130,7 @@ class VariableRiesgoControllerTest {
                 }
                 """;
 
-        mockMvc.perform(post("/api/v1/variables-riesgo")
+        mockMvc.perform(post("/api/v1/variables-riesgo").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payloadSinVariable))
                 .andExpect(status().isBadRequest())
@@ -125,7 +142,7 @@ class VariableRiesgoControllerTest {
         when(crearVariableRiesgoUseCase.crear(any(CrearVariableRiesgoRequest.class)))
                 .thenThrow(new VariableRiesgoDuplicadaException());
 
-        mockMvc.perform(post("/api/v1/variables-riesgo")
+        mockMvc.perform(post("/api/v1/variables-riesgo").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(solicitudValida())))
                 .andExpect(status().isConflict())
@@ -138,7 +155,7 @@ class VariableRiesgoControllerTest {
         when(crearVariableRiesgoUseCase.crear(any(CrearVariableRiesgoRequest.class)))
                 .thenThrow(new RuntimeException("fallo inesperado de infraestructura"));
 
-        mockMvc.perform(post("/api/v1/variables-riesgo")
+        mockMvc.perform(post("/api/v1/variables-riesgo").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(solicitudValida())))
                 .andExpect(status().isInternalServerError())
@@ -160,7 +177,7 @@ class VariableRiesgoControllerTest {
         when(cambiarEstadoVariableRiesgoUseCase.cambiarEstado(eq(25L), any(CambiarEstadoVariableRiesgoRequest.class)))
                 .thenReturn(response);
 
-        mockMvc.perform(patch("/api/v1/variables-riesgo/25/estado")
+        mockMvc.perform(patch("/api/v1/variables-riesgo/25/estado").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CambiarEstadoVariableRiesgoRequest(EstadoVariableRiesgo.INACTIVA))))
                 .andExpect(status().isOk())
@@ -175,7 +192,7 @@ class VariableRiesgoControllerTest {
         when(cambiarEstadoVariableRiesgoUseCase.cambiarEstado(eq(999L), any(CambiarEstadoVariableRiesgoRequest.class)))
                 .thenThrow(new VariableRiesgoNoEncontradaException());
 
-        mockMvc.perform(patch("/api/v1/variables-riesgo/999/estado")
+        mockMvc.perform(patch("/api/v1/variables-riesgo/999/estado").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CambiarEstadoVariableRiesgoRequest(EstadoVariableRiesgo.INACTIVA))))
                 .andExpect(status().isNotFound())
@@ -189,7 +206,7 @@ class VariableRiesgoControllerTest {
                 { "estado": "SUSPENDIDA" }
                 """;
 
-        mockMvc.perform(patch("/api/v1/variables-riesgo/25/estado")
+        mockMvc.perform(patch("/api/v1/variables-riesgo/25/estado").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payloadConEstadoInvalido))
                 .andExpect(status().isBadRequest())
@@ -200,7 +217,7 @@ class VariableRiesgoControllerTest {
     void debeRetornar400CuandoElEstadoEsNuloOAusente() throws Exception {
         String payloadSinEstado = "{}";
 
-        mockMvc.perform(patch("/api/v1/variables-riesgo/25/estado")
+        mockMvc.perform(patch("/api/v1/variables-riesgo/25/estado").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payloadSinEstado))
                 .andExpect(status().isBadRequest())
@@ -209,7 +226,7 @@ class VariableRiesgoControllerTest {
 
     @Test
     void debeRetornar400CuandoElIdRiesgoNoEsNumerico() throws Exception {
-        mockMvc.perform(patch("/api/v1/variables-riesgo/abc/estado")
+        mockMvc.perform(patch("/api/v1/variables-riesgo/abc/estado").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CambiarEstadoVariableRiesgoRequest(EstadoVariableRiesgo.INACTIVA))))
                 .andExpect(status().isBadRequest())

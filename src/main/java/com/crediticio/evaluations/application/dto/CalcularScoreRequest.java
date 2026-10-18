@@ -1,10 +1,13 @@
 package com.crediticio.evaluations.application.dto;
 
+import com.crediticio.shared.util.EnteroLargoEstrictoDeserializer;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Pattern;
+import tools.jackson.databind.annotation.JsonDeserialize;
 
 public class CalcularScoreRequest {
 
+    @JsonDeserialize(using = EnteroLargoEstrictoDeserializer.class)
     private Long idSolicitante;
 
     @Pattern(regexp = "\\d{6,15}", message = "numeroDocumento debe contener entre 6 y 15 dígitos")

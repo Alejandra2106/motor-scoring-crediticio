@@ -7,4 +7,6 @@ import java.util.List;
 public interface DetalleEvaluacionJpaRepository extends JpaRepository<DetalleEvaluacionJpaEntity, Long> {
 
     List<DetalleEvaluacionJpaEntity> findByIdEvaluacion(Long idEvaluacion);
+
+    List<DetalleEvaluacionJpaEntity> findByIdEvaluacionOrderByIdDetalleEvaluacion(Long idEvaluacion);
 }

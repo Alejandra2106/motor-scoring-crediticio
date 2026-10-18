@@ -1,6 +1,7 @@
 package com.crediticio.scoring.application.dto;
 
 import com.crediticio.scoring.domain.OperadorScoring;
+import com.crediticio.shared.util.EnteroLargoEstrictoDeserializer;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -10,6 +11,7 @@ import tools.jackson.databind.annotation.JsonDeserialize;
 public class CrearReglaScoringRequest {
 
     @NotNull(message = "idRiesgo es obligatorio")
+    @JsonDeserialize(using = EnteroLargoEstrictoDeserializer.class)
     private Long idRiesgo;
 
     @NotNull(message = "operador es obligatorio")

@@ -2,10 +2,17 @@ package com.crediticio.shared.exception;
 
 import com.crediticio.applicants.domain.DocumentoDuplicadoException;
 import com.crediticio.applicants.domain.SolicitanteNoEncontradoException;
+import com.crediticio.evaluations.domain.EvaluacionNoEncontradaException;
+import com.crediticio.evaluations.domain.EvaluacionSinPoliticaVigenteException;
 import com.crediticio.evaluations.domain.NivelEndeudamientoIndeterminadoException;
+import com.crediticio.evaluations.domain.PuntajeSinClasificacionException;
 import com.crediticio.evaluations.domain.SolicitanteEvaluacionNoEncontradoException;
 import com.crediticio.riskvariables.domain.VariableRiesgoDuplicadaException;
 import com.crediticio.riskvariables.domain.VariableRiesgoNoEncontradaException;
+import com.crediticio.scoring.domain.PoliticaClasificacionInvalidaException;
+import com.crediticio.scoring.domain.PoliticaVigenteNoDisponibleException;
+import com.crediticio.scoring.domain.PublicacionPoliticaConcurrenteException;
+import com.crediticio.scoring.domain.PublicacionSinAutorException;
 import com.crediticio.scoring.domain.ReglaScoringDuplicadaException;
 import com.crediticio.scoring.domain.ReglaScoringNoEncontradaException;
 import com.crediticio.scoring.domain.ReglaScoringVariableInactivaException;
@@ -101,6 +108,32 @@ public class GlobalExceptionHandler {
         return construirRespuesta(HttpStatus.NOT_FOUND, "REGLA_SCORING_NO_ENCONTRADA", ex.getMessage(), List.of());
     }
 
+    @ExceptionHandler(PoliticaClasificacionInvalidaException.class)
+    public ResponseEntity<ApiError> manejarPoliticaClasificacionInvalida(PoliticaClasificacionInvalidaException ex) {
+        log.warn("Publicación rechazada: la política de clasificación no supera las validaciones ({} errores)",
+                ex.getErrores().size());
+        return construirRespuesta(HttpStatus.BAD_REQUEST, "POLITICA_CLASIFICACION_INVALIDA", ex.getMessage(),
+                ex.getErrores());
+    }
+
+    @ExceptionHandler(PoliticaVigenteNoDisponibleException.class)
+    public ResponseEntity<ApiError> manejarPoliticaVigenteNoDisponible(PoliticaVigenteNoDisponibleException ex) {
+        log.warn("Consulta de la política de clasificación vigente sin política publicada");
+        return construirRespuesta(HttpStatus.NOT_FOUND, "POLITICA_VIGENTE_NO_DISPONIBLE", ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(PublicacionPoliticaConcurrenteException.class)
+    public ResponseEntity<ApiError> manejarPublicacionPoliticaConcurrente(PublicacionPoliticaConcurrenteException ex) {
+        log.warn("Publicación de política de clasificación rechazada por una publicación concurrente");
+        return construirRespuesta(HttpStatus.CONFLICT, "PUBLICACION_CONCURRENTE", ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(PublicacionSinAutorException.class)
+    public ResponseEntity<ApiError> manejarPublicacionSinAutor(PublicacionSinAutorException ex) {
+        log.warn("Publicación de política de clasificación rechazada: no hay un usuario autenticado");
+        return construirRespuesta(HttpStatus.UNAUTHORIZED, "NO_AUTENTICADO", ex.getMessage(), List.of());
+    }
+
     @ExceptionHandler(SolicitanteEvaluacionNoEncontradoException.class)
     public ResponseEntity<ApiError> manejarSolicitanteEvaluacionNoEncontrado(SolicitanteEvaluacionNoEncontradoException ex) {
         log.warn("Cálculo de score sobre un solicitante que no existe");
@@ -111,6 +144,24 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> manejarNivelEndeudamientoIndeterminado(NivelEndeudamientoIndeterminadoException ex) {
         log.warn("Cálculo de score bloqueado por NIVEL_ENDEUDAMIENTO indeterminado (ingresos mensuales en cero)");
         return construirRespuesta(HttpStatus.CONFLICT, "NIVEL_ENDEUDAMIENTO_INDETERMINADO", ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(EvaluacionSinPoliticaVigenteException.class)
+    public ResponseEntity<ApiError> manejarEvaluacionSinPoliticaVigente(EvaluacionSinPoliticaVigenteException ex) {
+        log.warn("Cálculo de score rechazado: no existe una política de clasificación vigente");
+        return construirRespuesta(HttpStatus.CONFLICT, "POLITICA_VIGENTE_NO_DISPONIBLE", ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(PuntajeSinClasificacionException.class)
+    public ResponseEntity<ApiError> manejarPuntajeSinClasificacion(PuntajeSinClasificacionException ex) {
+        log.warn("Cálculo de score rechazado: el puntaje total no pertenece a ningún rango de la política vigente");
+        return construirRespuesta(HttpStatus.CONFLICT, "PUNTAJE_SIN_CLASIFICACION", ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(EvaluacionNoEncontradaException.class)
+    public ResponseEntity<ApiError> manejarEvaluacionNoEncontrada(EvaluacionNoEncontradaException ex) {
+        log.warn("Consulta de una evaluación que no existe");
+        return construirRespuesta(HttpStatus.NOT_FOUND, "EVALUACION_NO_ENCONTRADA", ex.getMessage(), List.of());
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)

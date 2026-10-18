@@ -5,36 +5,63 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Evaluación de score crediticio de un solicitante. El puntaje total (RF07/CLAUDE.md §12) se
- * calcula en tiempo de uso como la suma de {@code puntajeObtenido} de sus detalles; nunca se
- * persiste como columna propia.
+ * Evaluación de score crediticio de un solicitante. El puntaje total (RF07) es la suma de
+ * {@code puntajeObtenido} de sus detalles.
+ *
+ * HU12 CA05: por excepción aprobada a CLAUDE.md §12, el puntaje total se persiste junto con la
+ * clasificación y la referencia a la política utilizada. El valor persistido nunca sustituye a la
+ * suma: al reconstruir, si no coincide con los detalles la evaluación se considera inconsistente
+ * (CA07). Las evaluaciones anteriores a HU12 no tienen puntaje persistido ni clasificación, y no se
+ * reclasifican.
  */
 public class Evaluacion {
 
     private final Long idEvaluacion;
     private final Long idSolicitante;
     private final LocalDateTime fechaEvaluacion;
+    private final ClasificacionEvaluacion clasificacion;
     private final List<DetalleEvaluacion> detalles;
 
     private Evaluacion(Long idEvaluacion, Long idSolicitante, LocalDateTime fechaEvaluacion,
-            List<DetalleEvaluacion> detalles) {
+            ClasificacionEvaluacion clasificacion, List<DetalleEvaluacion> detalles) {
         this.idEvaluacion = idEvaluacion;
         this.idSolicitante = Objects.requireNonNull(idSolicitante, "idSolicitante es obligatorio");
         this.fechaEvaluacion = fechaEvaluacion;
+        this.clasificacion = clasificacion;
         this.detalles = List.copyOf(Objects.requireNonNull(detalles, "detalles es obligatorio"));
     }
 
-    public static Evaluacion nueva(Long idSolicitante, List<DetalleEvaluacion> detalles) {
-        return new Evaluacion(null, idSolicitante, null, detalles);
+    /** Toda evaluación nueva debe estar clasificada (HU12 CA03/CA05). */
+    public static Evaluacion nueva(Long idSolicitante, List<DetalleEvaluacion> detalles,
+            ClasificacionEvaluacion clasificacion) {
+        Objects.requireNonNull(clasificacion, "clasificacion es obligatoria");
+        return new Evaluacion(null, idSolicitante, null, clasificacion, detalles);
     }
 
+    /**
+     * @param scoreTotalPersistido puntaje total almacenado; null solo en evaluaciones anteriores a HU12
+     * @param clasificacion        null solo en evaluaciones anteriores a HU12
+     */
     public static Evaluacion reconstruir(Long idEvaluacion, Long idSolicitante, LocalDateTime fechaEvaluacion,
-            List<DetalleEvaluacion> detalles) {
-        return new Evaluacion(idEvaluacion, idSolicitante, fechaEvaluacion, detalles);
+            Integer scoreTotalPersistido, ClasificacionEvaluacion clasificacion, List<DetalleEvaluacion> detalles) {
+        if ((scoreTotalPersistido == null) != (clasificacion == null)) {
+            throw new IllegalStateException("La evaluación " + idEvaluacion
+                    + " tiene datos de clasificación incompletos");
+        }
+        Evaluacion evaluacion = new Evaluacion(idEvaluacion, idSolicitante, fechaEvaluacion, clasificacion, detalles);
+        if (scoreTotalPersistido != null && scoreTotalPersistido != evaluacion.getScoreTotal()) {
+            throw new IllegalStateException("El puntaje total almacenado de la evaluación " + idEvaluacion
+                    + " no coincide con la suma de sus detalles");
+        }
+        return evaluacion;
+    }
+
+    public static int sumarPuntajes(List<DetalleEvaluacion> detalles) {
+        return detalles.stream().mapToInt(DetalleEvaluacion::getPuntajeObtenido).sum();
     }
 
     public int getScoreTotal() {
-        return detalles.stream().mapToInt(DetalleEvaluacion::getPuntajeObtenido).sum();
+        return sumarPuntajes(detalles);
     }
 
     public Long getIdEvaluacion() {
@@ -47,6 +74,11 @@ public class Evaluacion {
 
     public LocalDateTime getFechaEvaluacion() {
         return fechaEvaluacion;
+    }
+
+    /** Null solo en evaluaciones registradas antes de HU12. */
+    public ClasificacionEvaluacion getClasificacion() {
+        return clasificacion;
     }
 
     public List<DetalleEvaluacion> getDetalles() {

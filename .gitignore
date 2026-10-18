@@ -30,3 +30,11 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Claves y secretos (HU10): nunca se versionan ###
+*.pem
+*.key
+*.p12
+*.jks
+keys/
+secrets/

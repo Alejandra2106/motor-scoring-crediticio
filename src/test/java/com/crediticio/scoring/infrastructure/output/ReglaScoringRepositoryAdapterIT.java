@@ -6,12 +6,14 @@ import com.crediticio.scoring.domain.OperadorScoring;
 import com.crediticio.scoring.domain.ReglaScoring;
 import com.crediticio.scoring.domain.ReglaScoringDuplicadaException;
 import com.crediticio.scoring.domain.TipoVariable;
+import com.crediticio.support.ProteccionBaseIntegracion;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.ContextConfiguration;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -26,10 +28,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /**
  * Prueba de integración de persistencia contra PostgreSQL local real (no H2).
  *
- * Requiere que PostgreSQL local esté disponible y que las variables de entorno
- * DB_URL, DB_USERNAME y DB_PASSWORD apunten a una base de datos accesible, usando
- * el perfil "it" (src/test/resources/application-it.properties). Flyway aplicará
- * V4__create_regla_scoring_table.sql contra esa base al iniciar el contexto.
+ * Requiere PostgreSQL local y el perfil "it" (src/test/resources/application-it.properties).
+ * No usa DB_URL: la URL se indica explícitamente con -D y {@link ProteccionBaseIntegracion}
+ * aborta antes de crear el contexto (sin conectarse) si no apunta exactamente a la base
+ * dedicada autorizada. DB_USERNAME y DB_PASSWORD se toman del entorno. Flyway aplicará las
+ * migraciones pendientes contra esa base al iniciar el contexto.
  *
  * La tabla "riesgo" solo admite un registro por NombreVariableRiesgo (UNIQUE) y puede
  * contener ya datos reales de una verificación manual anterior (HU03/HU04); por eso las
@@ -38,11 +41,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * eliminan al finalizar.
  *
  * Al terminar en "IT" (no "Test"), Surefire no la ejecuta con `./mvnw test`.
- * Ejecución manual: ./mvnw test -Dtest=ReglaScoringRepositoryAdapterIT -Dspring.profiles.active=it
+ * Ejecución manual (requiere autorización expresa para usar la base dedicada):
+ * ./mvnw.cmd -B test "-Dtest=ReglaScoringRepositoryAdapterIT" "-Dspring.profiles.active=it"
+ *     "-Dit.base-dedicada=motor_scoring_it"
+ *     "-Dspring.datasource.url=jdbc:postgresql://localhost:5432/motor_scoring_it"
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("it")
+@ContextConfiguration(initializers = ProteccionBaseIntegracion.class)
 @Import(ReglaScoringRepositoryAdapter.class)
 class ReglaScoringRepositoryAdapterIT {
 
