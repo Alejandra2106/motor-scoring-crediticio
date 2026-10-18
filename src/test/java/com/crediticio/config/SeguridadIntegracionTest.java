@@ -115,7 +115,7 @@ class SeguridadIntegracionTest {
                 new Endpoint(HttpMethod.POST, "/api/v1/solicitantes", Set.of(ANALISTA)),
                 new Endpoint(HttpMethod.GET, "/api/v1/solicitantes/documento/1234567", Set.of(ADMIN, ANALISTA)),
                 new Endpoint(HttpMethod.POST, "/api/v1/evaluaciones", Set.of(ANALISTA)),
-                new Endpoint(HttpMethod.GET, "/api/v1/evaluaciones/1", Set.of(ANALISTA)),
+                new Endpoint(HttpMethod.GET, "/api/v1/evaluaciones/1", Set.of(ADMIN, ANALISTA)),
                 new Endpoint(HttpMethod.POST, "/api/v1/variables-riesgo", Set.of(ADMIN)),
                 new Endpoint(HttpMethod.PATCH, "/api/v1/variables-riesgo/25/estado", Set.of(ADMIN)),
                 new Endpoint(HttpMethod.POST, "/api/v1/reglas-scoring", Set.of(ADMIN)),

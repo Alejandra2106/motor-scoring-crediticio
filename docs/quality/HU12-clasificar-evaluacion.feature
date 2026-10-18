@@ -8,10 +8,8 @@ Característica: Clasificar una evaluación
   # GET /api/v1/evaluaciones/{idEvaluacion}: CA11 de esta historia exige restringir el acceso a los roles
   # autorizados, sin identificarlos; los roles los fija HU10 CA04. Requisito aprobado el 2026-10-18
   # (P-HU10-01 en HU10-autorizar-operaciones-segun-rol.feature): ambos roles pueden consultar una evaluación.
-  # Comportamiento implementado hoy: solo ANALISTA_CREDITO (decisión 6, 2026-10-17). Adaptar scoring-api, sus
-  # pruebas, su matriz y este Gherkin al requisito aprobado requiere una autorización específica, todavía no
-  # concedida. La aprobación no amplía ninguna otra operación.
-  # Actualizado el 2026-10-18 (solo documentación; no cambia el código).
+  # Implementado el 2026-10-18 (rama integracion/main-hu10-hu12); reemplaza la decisión 6 (2026-10-17), que lo
+  # restringía a ANALISTA_CREDITO. La aprobación no amplía ninguna otra operación.
   # Categorías de riesgo del dominio: BAJO, MEDIO y ALTO. Los rangos de cada
   # categoría no son fijos: los define la política de clasificación publicada (HU11), que cubre el
   # intervalo de -100 a 130.
@@ -68,17 +66,9 @@ Característica: Clasificar una evaluación
     Entonces la respuesta es 403 con el código ACCESO_DENEGADO
     Y no se registra ninguna evaluación
 
-  @comportamiento-implementado @pendiente-de-cambio
-  Escenario: Solo ANALISTA_CREDITO puede consultar evaluaciones por identificador (decisión 6, superada)
-    # Describe el comportamiento implementado hoy, que no cumple el requisito aprobado P-HU10-01. Se
-    # conserva solo como registro hasta que se autorice el cambio en scoring-api.
-    Cuando un usuario con rol ADMINISTRADOR_RIESGO consulta una evaluación por su identificador
-    Entonces la respuesta es 403 con el código ACCESO_DENEGADO
-
-  @requisito-aprobado @pendiente-de-implementacion
   Escenario: Ambos roles pueden consultar una evaluación por identificador (CA11 con HU10 CA04, P-HU10-01)
-    # Requisito aprobado el 2026-10-18. No implementado: requiere una autorización específica para cambiar
-    # scoring-api. Solo afecta a la consulta; no amplía el proceso de scoring ni la administración.
+    # Implementado el 2026-10-18; reemplaza el escenario de la decisión 6 (403 para ADMINISTRADOR_RIESGO).
+    # Solo afecta a la consulta; no amplía el proceso de scoring ni la administración.
     Dado una evaluación registrada
     Cuando un usuario con rol ADMINISTRADOR_RIESGO o ANALISTA_CREDITO la consulta por su identificador
     Entonces obtiene su puntaje total, su categoría y la versión de política utilizada

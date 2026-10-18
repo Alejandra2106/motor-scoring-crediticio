@@ -164,13 +164,15 @@ class EvaluacionControllerTest {
         verifyNoInteractions(consultarEvaluacionUseCase);
     }
 
+    /** HU10 CA04 (P-HU10-01): el administrador consulta evaluaciones, pero no ejecuta el scoring. */
     @Test
-    void elAdministradorNoDebeConsultarEvaluacionesPorId() throws Exception {
-        mockMvc.perform(get("/api/v1/evaluaciones/1").with(conRol(JwtConfig.ROL_ADMINISTRADOR)))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode").value("ACCESO_DENEGADO"));
+    void elAdministradorDebeConsultarEvaluacionesPorId() throws Exception {
+        when(consultarEvaluacionUseCase.consultarPorId(1L)).thenReturn(evaluacionClasificada());
 
-        verifyNoInteractions(consultarEvaluacionUseCase);
+        mockMvc.perform(get("/api/v1/evaluaciones/1").with(conRol(JwtConfig.ROL_ADMINISTRADOR)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.idEvaluacion").value(1))
+                .andExpect(jsonPath("$.categoria").value("MEDIO"));
     }
 
     @Test

@@ -51,7 +51,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/solicitantes/documento/*")
                                 .hasAnyRole(ROL_ADMINISTRADOR, ROL_ANALISTA)
                         .requestMatchers(HttpMethod.POST, "/api/v1/evaluaciones").hasRole(ROL_ANALISTA)
-                        .requestMatchers(HttpMethod.GET, "/api/v1/evaluaciones/*").hasRole(ROL_ANALISTA)
+                        // HU10 CA04 (P-HU10-01): ambos roles consultan; ejecutar el scoring sigue siendo del analista
+                        .requestMatchers(HttpMethod.GET, "/api/v1/evaluaciones/*")
+                                .hasAnyRole(ROL_ADMINISTRADOR, ROL_ANALISTA)
                         .requestMatchers(HttpMethod.POST, "/api/v1/variables-riesgo").hasRole(ROL_ADMINISTRADOR)
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/variables-riesgo/*/estado")
                                 .hasRole(ROL_ADMINISTRADOR)

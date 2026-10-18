@@ -61,14 +61,13 @@ Característica: Autorizar operaciones según el rol
   #   HU14 y HU15 son propuestas pendientes de implementación.
   #
   # Decisiones aprobadas (2026-10-18):
-  # - P-HU10-01 (requisito funcional aprobado; implementación pendiente). ADMINISTRADOR_RIESGO y
+  # - P-HU10-01 (requisito funcional aprobado; implementado en scoring-api el 2026-10-18). ADMINISTRADOR_RIESGO y
   #   ANALISTA_CREDITO pueden consultar evaluaciones, conforme a CA04. HU12 CA11 solo exige restringir el
   #   acceso a los roles autorizados, sin identificarlos, y no justifica restringir lo que CA04 garantiza.
   #   La aprobación solo afecta a la consulta: ejecutar el proceso de scoring sigue siendo exclusivo de
   #   ANALISTA_CREDITO (CA03) y la administración de variables, reglas y políticas, de ADMINISTRADOR_RIESGO
-  #   (CA02). Hoy scoring-api restringe GET /api/v1/evaluaciones/{idEvaluacion} a ANALISTA_CREDITO (decisión
-  #   6 de HU12); modificar scoring-api, sus pruebas, su matriz y su Gherkin requiere una autorización
-  #   específica, todavía no concedida.
+  #   (CA02). Reemplaza la decisión 6 de HU12, que restringía GET /api/v1/evaluaciones/{idEvaluacion} a
+  #   ANALISTA_CREDITO.
   # - P-HU10-03 (requisito de seguridad aprobado; transversal). Las tres API validan los tokens conforme a un
   #   contrato común emitido por auth-api (HU09: RS256 con kid; iss; aud; sub; role; iat; exp; jti) y
   #   comprueban los claims obligatorios, incluidos la expiración (exp), el sujeto (sub) y el rol (role)
@@ -167,8 +166,8 @@ Característica: Autorizar operaciones según el rol
 
   @scoring-api @evaluation-query-api
   Esquema del escenario: Consultas permitidas a ambos roles (CA04, P-HU10-01)
-    # Requisito aprobado. La consulta de una evaluación por ADMINISTRADOR_RIESGO está pendiente de
-    # implementación en scoring-api. Las consultas de HU13–HU15 están pendientes de implementación.
+    # Requisito aprobado. Implementado en scoring-api (consulta de solicitantes y evaluaciones) y en
+    # evaluation-query-api (HU13 y HU15); las recomendaciones (HU14) dependen de su implementación.
     Dado un usuario autenticado con el rol <rol>
     Cuando realiza la consulta de <consulta> en <api>
     Entonces la consulta se autoriza

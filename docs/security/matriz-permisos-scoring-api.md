@@ -23,7 +23,7 @@ Describe lo aplicado hoy en `SecurityConfig`. No todas las filas coinciden con l
 | `POST /api/v1/solicitantes` | 403 | Permitido | CA03 |
 | `GET /api/v1/solicitantes/documento/{numeroDocumento}` | Permitido | Permitido | CA04 |
 | `POST /api/v1/evaluaciones` | 403 | Permitido | CA03 |
-| `GET /api/v1/evaluaciones/{idEvaluacion}` | 403 | Permitido | Decisión 6 de HU12 (2026-10-17), superada por el requisito aprobado P-HU10-01: no cumple HU10 CA04 |
+| `GET /api/v1/evaluaciones/{idEvaluacion}` | Permitido | Permitido | HU10 CA04, P-HU10-01 (reemplaza la decisión 6 de HU12) |
 | `POST /api/v1/variables-riesgo` | Permitido | 403 | CA02 |
 | `PATCH /api/v1/variables-riesgo/{idRiesgo}/estado` | Permitido | 403 | CA02 |
 | `POST /api/v1/reglas-scoring` | Permitido | 403 | CA02 |
@@ -36,24 +36,20 @@ Describe lo aplicado hoy en `SecurityConfig`. No todas las filas coinciden con l
 
 HU12 añade `GET /api/v1/evaluaciones/{idEvaluacion}`. Su autorización está cubierta por pruebas sin
 base de datos real: `SeguridadIntegracionTest` (cadena de seguridad real con casos de uso simulados) y
-`EvaluacionControllerTest`. Sobre PostgreSQL lo validó `ClasificacionEvaluacionIT` el 2026-10-18 (200 para
-`ANALISTA_CREDITO`, 403 para `ADMINISTRADOR_RIESGO` y 401 sin token).
+`EvaluacionControllerTest`. Desde P-HU10-01 (2026-10-18, rama `integracion/main-hu10-hu12`) ambos roles
+reciben 200; antes, `ClasificacionEvaluacionIT` validó sobre PostgreSQL el comportamiento anterior (403 para
+`ADMINISTRADOR_RIESGO`), y su versión actualizada exige 200 para ambos roles y 401 sin token.
 Los rechazos funcionales de `POST /api/v1/evaluaciones` (409 `POLITICA_VIGENTE_NO_DISPONIBLE` y 409
 `PUNTAJE_SIN_CLASIFICACION`) no son de autorización; se documentan en
 `docs/quality/HU12-clasificar-evaluacion.feature`.
 
 ## Requisitos aprobados pendientes de implementación (2026-10-18)
 
-Ninguna de estas filas está aplicada todavía; figurar aquí no significa que estén implementadas.
+Figurar aquí no significa que estén implementados.
 
-| Endpoint | ADMINISTRADOR_RIESGO | ANALISTA_CREDITO | Requisito |
-| --- | --- | --- | --- |
-| `GET /api/v1/evaluaciones/{idEvaluacion}` | Permitido | Permitido | HU10 CA04, P-HU10-01 |
-
-- **P-HU10-01.** Ambos roles pueden consultar una evaluación. Solo afecta a la consulta: `POST
+- **P-HU10-01:** implementado el 2026-10-18 (ver la matriz). Solo afecta a la consulta: `POST
   /api/v1/evaluaciones` (proceso de scoring) sigue siendo solo de `ANALISTA_CREDITO` y la administración de
-  variables, reglas y políticas, solo de `ADMINISTRADOR_RIESGO`. Cambiar `SecurityConfig`, sus pruebas, esta
-  matriz y el Gherkin de HU12 requiere una autorización específica, todavía no concedida.
+  variables, reglas y políticas, solo de `ADMINISTRADOR_RIESGO`.
 - **P-HU10-03.** Validación de los tokens conforme al contrato común, con comprobación de `exp`, `sub` y `role`.
   Requisito transversal; los detalles que el contrato no define (obligatoriedad de `iat`, `jti` y `kid`,
   tratamiento de `nbf` y composición de la audiencia) siguen pendientes. La sección "Autenticación" describe las

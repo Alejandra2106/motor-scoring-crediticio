@@ -215,11 +215,12 @@ class ClasificacionEvaluacionIT {
 
     @Test
     @Order(6)
-    void soloElAnalistaDebeConsultarEvaluacionesPorId() throws Exception {
+    void ambosRolesDebenConsultarEvaluacionesPorId() throws Exception {
+        // HU10 CA04 (P-HU10-01)
         mockMvc.perform(get(RUTA_EVALUACIONES + "/" + idEvaluacionConPolitica1)
                         .with(conRol(JwtConfig.ROL_ADMINISTRADOR)))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode").value("ACCESO_DENEGADO"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.idEvaluacion").value(idEvaluacionConPolitica1));
         mockMvc.perform(get(RUTA_EVALUACIONES + "/" + idEvaluacionConPolitica1))
                 .andExpect(status().isUnauthorized());
     }
