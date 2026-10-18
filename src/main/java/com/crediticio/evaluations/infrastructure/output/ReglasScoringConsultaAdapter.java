@@ -13,13 +13,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * Único componente de {@code evaluations} que conoce el modelo de dominio de {@code scoring}.
- * Traduce esa información hacia el contrato propio de {@code evaluations}
- * ({@link ReglasScoringConsultaPort}), reutilizando los puertos de salida ya existentes en
- * {@code scoring} ({@link ReglaScoringRepositoryPort} y {@link ConsultarVariableRiesgoPort},
- * este último ya usado por HU05/HU06) sin duplicar la semántica de operadores.
- */
+
+
+
+
+
+
+
 @Component
 public class ReglasScoringConsultaAdapter implements ReglasScoringConsultaPort {
 

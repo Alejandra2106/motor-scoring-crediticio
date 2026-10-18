@@ -48,7 +48,7 @@ public class SolicitanteJpaEntity {
     private LocalDateTime fechaRegistro;
 
     protected SolicitanteJpaEntity() {
-        // requerido por JPA
+        
     }
 
     public SolicitanteJpaEntity(String nombreCompleto, String numeroDocumento, BigDecimal ingresosMensuales,

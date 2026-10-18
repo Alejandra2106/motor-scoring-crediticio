@@ -41,7 +41,7 @@ public class ReglaScoringJpaEntity {
     private LocalDateTime fechaCreacion;
 
     protected ReglaScoringJpaEntity() {
-        // requerido por JPA
+        
     }
 
     public ReglaScoringJpaEntity(Long idRiesgo, String operador, String valorCondicion, Integer puntaje,

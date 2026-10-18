@@ -2,14 +2,14 @@ package com.crediticio.evaluations.domain;
 
 import java.util.Objects;
 
-/**
- * Detalle de una regla considerada durante una evaluación. Conserva, además del resultado
- * ({@code condicionCumplida} y {@code puntajeObtenido}), un snapshot de la condición de la
- * regla tal como fue aplicada en ese momento ({@code operadorAplicado}, {@code
- * valorCondicionAplicado} y {@code puntajeReglaAplicado}), porque {@code regla_scoring} puede
- * editarse en el mismo registro (HU06) y no debe depender de un JOIN futuro para reconstruir
- * el histórico (RF11/RNF06).
- */
+
+
+
+
+
+
+
+
 public class DetalleEvaluacion {
 
     private final Long idDetalleEvaluacion;

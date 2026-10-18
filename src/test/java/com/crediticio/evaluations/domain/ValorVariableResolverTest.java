@@ -47,7 +47,7 @@ class ValorVariableResolverTest {
 
     @Test
     void debeCalcularNivelEndeudamientoComoPorcentajeDeDeudasSobreIngresos() {
-        // D1: NIVEL_ENDEUDAMIENTO = (deudas_mensuales / ingresos_mensuales) x 100
+        
         SolicitanteParaEvaluacion solicitante = solicitante(new BigDecimal("4000000"), new BigDecimal("1200000"),
                 0, "BUENO", new BigDecimal("1"));
 
@@ -57,7 +57,7 @@ class ValorVariableResolverTest {
 
     @Test
     void debeLanzarNivelEndeudamientoIndeterminadoCuandoIngresosMensualesEsCero() {
-        // D8: bloqueo explícito, sin división por cero ni valor sustituto
+        
         SolicitanteParaEvaluacion solicitante = solicitante(BigDecimal.ZERO, new BigDecimal("500000"),
                 0, "BUENO", new BigDecimal("1"));
 
@@ -67,8 +67,8 @@ class ValorVariableResolverTest {
 
     @Test
     void debeLanzarExcepcionDefensivaCuandoFaltaUnDatoRequerido() {
-        // RF05: validación defensiva; con las restricciones actuales de SOLICITANTE este caso
-        // no es alcanzable con datos persistidos, pero se valida igual sin asumir el dato.
+        
+        
         SolicitanteParaEvaluacion solicitante = solicitante(null, new BigDecimal("500000"),
                 0, "BUENO", new BigDecimal("1"));
 

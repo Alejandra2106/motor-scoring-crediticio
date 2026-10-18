@@ -18,7 +18,8 @@ import org.springframework.context.annotation.Configuration;
  * Contrato OpenAPI de scoring-api (HU10): todos los endpoints de negocio exigen un JWT de acceso
  * emitido por auth-api (esquema bearerAuth) y pueden responder 401/403 con el formato ApiError.
  * Las respuestas de seguridad se documentan aquí una sola vez en lugar de repetirse en cada
- * controlador; un controlador puede seguir documentándolas con un texto propio.
+ * controlador; un controlador puede seguir documentándolas con un texto propio. info.version sigue la
+ * política de docs/api/openapi/politica-versionado.md (integrada desde origin/main).
  */
 @Configuration
 public class OpenApiConfig {
@@ -31,7 +32,7 @@ public class OpenApiConfig {
         return new OpenAPI()
                 .info(new Info()
                         .title("scoring-api - Motor de Scoring de Riesgo Crediticio")
-                        .version("v1")
+                        .version("1.0.0")
                         .description("Solicitantes, variables de riesgo, reglas de scoring, cálculo del score "
                                 + "y políticas de clasificación. Requiere un JWT de acceso emitido por auth-api."))
                 .components(new Components().addSecuritySchemes(ESQUEMA_SEGURIDAD, new SecurityScheme()

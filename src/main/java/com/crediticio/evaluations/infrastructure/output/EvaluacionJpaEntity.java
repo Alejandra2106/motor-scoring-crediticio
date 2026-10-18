@@ -39,7 +39,7 @@ public class EvaluacionJpaEntity {
     private Long idPolitica;
 
     protected EvaluacionJpaEntity() {
-        // requerido por JPA
+        
     }
 
     public EvaluacionJpaEntity(Long idSolicitante, Integer scoreTotal, String categoria, Long idPolitica) {

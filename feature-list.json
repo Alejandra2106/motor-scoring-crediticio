@@ -24,17 +24,17 @@
     {
       "id": "HU05",
       "title": "Crear regla de scoring",
-      "status": "pending"
+      "status": "completed"
     },
     {
       "id": "HU06",
       "title": "Editar regla de scoring",
-      "status": "pending"
+      "status": "completed"
     },
     {
       "id": "HU07",
       "title": "Calcular score crediticio",
-      "status": "pending"
+      "status": "completed"
     }
   ]
 }

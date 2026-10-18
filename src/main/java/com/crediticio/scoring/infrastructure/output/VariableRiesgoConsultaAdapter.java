@@ -12,11 +12,11 @@ import org.springframework.stereotype.Component;
 
 import java.util.Optional;
 
-/**
- * Único componente de {@code scoring} que conoce el modelo de dominio de {@code riskvariables}.
- * Traduce esa información hacia el contrato propio de {@code scoring} ({@link ConsultarVariableRiesgoPort}),
- * reutilizando el puerto de persistencia ya existente en {@code riskvariables} sin duplicarlo.
- */
+
+
+
+
+
 @Component
 public class VariableRiesgoConsultaAdapter implements ConsultarVariableRiesgoPort {
 

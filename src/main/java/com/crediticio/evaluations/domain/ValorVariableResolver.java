@@ -3,15 +3,15 @@ package com.crediticio.evaluations.domain;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
-/**
- * Resuelve el valor real del solicitante correspondiente a una variable de riesgo activa,
- * como texto comparable contra {@code valorCondicion} de una regla de scoring (RF06).
- *
- * RF05 (validación defensiva): los campos financieros del solicitante son obligatorios desde
- * HU01 (restricciones {@code NOT NULL} en la tabla {@code solicitante}), por lo que un dato
- * nulo no debería poder llegar aquí; se valida de todas formas para no asumir silenciosamente
- * un valor incorrecto si esa garantía llegara a fallar.
- */
+
+
+
+
+
+
+
+
+
 public final class ValorVariableResolver {
 
     private ValorVariableResolver() {

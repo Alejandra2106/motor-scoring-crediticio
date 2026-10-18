@@ -135,11 +135,11 @@ public class ReglaScoring {
         return fechaCreacion;
     }
 
-    /**
-     * Determina si esta regla se cumple para un valor real del solicitante, reutilizando
-     * la semántica de {@link OperadorScoring} ya validada en la creación/edición de la regla.
-     * Para variables categóricas el único operador permitido es la igualdad exacta de texto.
-     */
+    
+
+
+
+
     public boolean evaluar(String valorReal, TipoVariable tipoVariable) {
         Objects.requireNonNull(valorReal, "valorReal es obligatorio");
         Objects.requireNonNull(tipoVariable, "tipoVariable es obligatorio");

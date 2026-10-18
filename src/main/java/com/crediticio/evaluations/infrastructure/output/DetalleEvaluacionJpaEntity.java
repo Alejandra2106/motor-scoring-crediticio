@@ -38,7 +38,7 @@ public class DetalleEvaluacionJpaEntity {
     private Integer puntajeObtenido;
 
     protected DetalleEvaluacionJpaEntity() {
-        // requerido por JPA
+        
     }
 
     public DetalleEvaluacionJpaEntity(Long idEvaluacion, Long idRegla, String operadorAplicado,
