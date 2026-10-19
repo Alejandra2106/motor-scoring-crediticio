@@ -6,12 +6,14 @@ import com.crediticio.scoring.domain.OperadorScoring;
 import com.crediticio.scoring.domain.ReglaScoring;
 import com.crediticio.scoring.domain.ReglaScoringDuplicadaException;
 import com.crediticio.scoring.domain.TipoVariable;
+import com.crediticio.support.ProteccionBaseIntegracion;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.ContextConfiguration;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -23,26 +25,31 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+/**
+ * Prueba de integración de persistencia contra PostgreSQL local real (no H2).
+ *
+ * Requiere PostgreSQL local y el perfil "it" (src/test/resources/application-it.properties).
+ * No usa DB_URL: la URL se indica explícitamente con -D y {@link ProteccionBaseIntegracion}
+ * aborta antes de crear el contexto (sin conectarse) si no apunta exactamente a la base
+ * dedicada autorizada. DB_USERNAME y DB_PASSWORD se toman del entorno. Flyway aplicará las
+ * migraciones pendientes contra esa base al iniciar el contexto.
+ *
+ * La tabla "riesgo" solo admite un registro por NombreVariableRiesgo (UNIQUE) y puede
+ * contener ya datos reales de una verificación manual anterior (HU03/HU04); por eso las
+ * variables de riesgo necesarias como fixture se garantizan con un upsert idempotente
+ * (obtenerOAsegurarRiesgoActivo) en vez de insertarlas siempre "en limpio", y nunca se
+ * eliminan al finalizar.
+ *
+ * Al terminar en "IT" (no "Test"), Surefire no la ejecuta con `./mvnw test`.
+ * Ejecución manual (requiere autorización expresa para usar la base dedicada):
+ * ./mvnw.cmd -B test "-Dtest=ReglaScoringRepositoryAdapterIT" "-Dspring.profiles.active=it"
+ *     "-Dit.base-dedicada=motor_scoring_it"
+ *     "-Dspring.datasource.url=jdbc:postgresql://localhost:5432/motor_scoring_it"
+ */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("it")
+@ContextConfiguration(initializers = ProteccionBaseIntegracion.class)
 @Import(ReglaScoringRepositoryAdapter.class)
 class ReglaScoringRepositoryAdapterIT {
 
@@ -189,9 +196,9 @@ class ReglaScoringRepositoryAdapterIT {
 
     @Test
     void laBaseDeDatosDebeRechazarUnUpdateQueDuplicaOtraReglaExistente() throws SQLException {
-        
-        
-        
+        // Defensa en profundidad: aunque la aplicación ya excluye la propia regla en
+        // existeCombinacion, la restricción UNIQUE de la base de datos debe seguir
+        // rechazando un UPDATE que produzca la misma combinación de otra fila.
         Long idRiesgo = obtenerOAsegurarRiesgoActivo(NombreVariableRiesgo.NUMERO_MORAS);
         String valorA = String.valueOf(System.nanoTime() % 1000);
         String valorB = String.valueOf((System.nanoTime() + 1) % 1000);
@@ -209,9 +216,9 @@ class ReglaScoringRepositoryAdapterIT {
 
     @Test
     void laBaseDeDatosDebeRechazarUnOperadorFueraDelConjuntoPermitidoAunSaltandoLaValidacionDeDominio() throws SQLException {
-        
-        
-        
+        // El dominio (OperadorScoring) jamás permitiría un símbolo fuera del enum: se inserta
+        // directamente vía SQL nativo para comprobar que la restricción definitiva
+        // (ck_regla_scoring_operador) vive en la base de datos, no solo en la aplicación.
         Long idRiesgo = obtenerOAsegurarRiesgoActivo(NombreVariableRiesgo.HISTORIAL_CREDITICIO);
 
         try (Connection connection = dataSource.getConnection()) {

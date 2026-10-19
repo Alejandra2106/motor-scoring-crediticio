@@ -3,6 +3,7 @@ package com.crediticio.applicants.infrastructure.output;
 import com.crediticio.applicants.domain.DocumentoDuplicadoException;
 import com.crediticio.applicants.domain.HistorialCrediticio;
 import com.crediticio.applicants.domain.Solicitante;
+import com.crediticio.support.ProteccionBaseIntegracion;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -10,6 +11,7 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.ContextConfiguration;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -17,20 +19,25 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-
-
-
-
-
-
-
-
-
-
-
+/**
+ * Prueba de integración de persistencia contra PostgreSQL local real (no H2).
+ *
+ * Requiere PostgreSQL local y el perfil "it" (src/test/resources/application-it.properties).
+ * No usa DB_URL: la URL se indica explícitamente con -D y {@link ProteccionBaseIntegracion}
+ * aborta antes de crear el contexto (sin conectarse) si no apunta exactamente a la base
+ * dedicada autorizada. DB_USERNAME y DB_PASSWORD se toman del entorno. Flyway aplicará las
+ * migraciones pendientes contra esa base al iniciar el contexto.
+ *
+ * Al terminar en "IT" (no "Test"), Surefire no la ejecuta con `./mvnw test`.
+ * Ejecución manual (requiere autorización expresa para usar la base dedicada):
+ * ./mvnw.cmd -B test "-Dtest=SolicitanteRepositoryAdapterIT" "-Dspring.profiles.active=it"
+ *     "-Dit.base-dedicada=motor_scoring_it"
+ *     "-Dspring.datasource.url=jdbc:postgresql://localhost:5432/motor_scoring_it"
+ */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("it")
+@ContextConfiguration(initializers = ProteccionBaseIntegracion.class)
 @Import(SolicitanteRepositoryAdapter.class)
 class SolicitanteRepositoryAdapterIT {
 
@@ -114,9 +121,9 @@ class SolicitanteRepositoryAdapterIT {
 
     @Test
     void laBaseDeDatosDebeRechazarIngresosMensualesNegativosAunSaltandoLaValidacionDeDominio() {
-        
-        
-        
+        // El dominio (Solicitante) jamás permitiría este valor: se construye la entidad JPA
+        // directamente para comprobar que la restricción de integridad definitiva vive en la
+        // base de datos (CHECK ck_solicitante_ingresos_mensuales), no solo en la aplicación.
         SolicitanteJpaEntity entityConIngresosNegativos = new SolicitanteJpaEntity(
                 "Ana María Pérez", "6001005", new BigDecimal("-1"), new BigDecimal("500000"), 0,
                 HistorialCrediticio.BUENO, new BigDecimal("2.5"));

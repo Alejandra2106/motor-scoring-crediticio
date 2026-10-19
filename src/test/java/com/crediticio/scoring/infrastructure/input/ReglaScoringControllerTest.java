@@ -1,5 +1,7 @@
 package com.crediticio.scoring.infrastructure.input;
 
+import com.crediticio.config.JwtConfig;
+import com.crediticio.config.SecurityConfig;
 import com.crediticio.scoring.application.dto.CrearReglaScoringRequest;
 import com.crediticio.scoring.application.dto.EditarReglaScoringRequest;
 import com.crediticio.scoring.application.dto.ReglaScoringResponse;
@@ -20,14 +22,24 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
+import java.util.List;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mockingDetails;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -35,11 +47,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(ReglaScoringController.class)
-@Import({GlobalExceptionHandler.class, TraceIdFilter.class})
+@Import({GlobalExceptionHandler.class, TraceIdFilter.class, SecurityConfig.class})
 class ReglaScoringControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    /** HU10: la cadena de seguridad real exige un JWT; aquí se simula el token ya validado con su rol. */
+    @MockitoBean
+    private JwtDecoder jwtDecoder;
+
+    private static RequestPostProcessor conRol(String rol) {
+        return jwt().jwt(token -> token.subject(UUID.randomUUID().toString()).claim(JwtConfig.CLAIM_ROL, rol))
+                .authorities(new SimpleGrantedAuthority("ROLE_" + rol));
+    }
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -55,7 +76,7 @@ class ReglaScoringControllerTest {
         ReglaScoringResponse response = new ReglaScoringResponse(1L, 1L, OperadorScoring.MAYOR_O_IGUAL, "3000000", 20);
         when(crearReglaScoringUseCase.crear(any(CrearReglaScoringRequest.class))).thenReturn(response);
 
-        mockMvc.perform(post("/api/v1/reglas-scoring")
+        mockMvc.perform(post("/api/v1/reglas-scoring").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -77,7 +98,7 @@ class ReglaScoringControllerTest {
                 }
                 """;
 
-        mockMvc.perform(post("/api/v1/reglas-scoring")
+        mockMvc.perform(post("/api/v1/reglas-scoring").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payloadSinIdRiesgo))
                 .andExpect(status().isBadRequest())
@@ -96,7 +117,7 @@ class ReglaScoringControllerTest {
                 }
                 """;
 
-        mockMvc.perform(post("/api/v1/reglas-scoring")
+        mockMvc.perform(post("/api/v1/reglas-scoring").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payloadConOperadorInvalido))
                 .andExpect(status().isBadRequest())
@@ -114,7 +135,7 @@ class ReglaScoringControllerTest {
                 }
                 """;
 
-        mockMvc.perform(post("/api/v1/reglas-scoring")
+        mockMvc.perform(post("/api/v1/reglas-scoring").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payloadConPuntajeFueraDeRango))
                 .andExpect(status().isBadRequest())
@@ -123,8 +144,8 @@ class ReglaScoringControllerTest {
 
     @Test
     void debeRetornar400YNoLlegarAlCasoDeUsoCuandoElPuntajeEsElDecimalReportado() throws Exception {
-        
-        
+        // Reproduce exactamente el defecto reportado: Jackson truncaba "puntaje": 20.5 a 20
+        // en vez de rechazarlo (RF09 exige un entero estricto, sin truncar ni redondear).
         String payloadConPuntajeDecimalReportado = """
                 {
                   "idRiesgo": 109,
@@ -134,7 +155,7 @@ class ReglaScoringControllerTest {
                 }
                 """;
 
-        mockMvc.perform(post("/api/v1/reglas-scoring")
+        mockMvc.perform(post("/api/v1/reglas-scoring").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payloadConPuntajeDecimalReportado))
                 .andExpect(status().isBadRequest())
@@ -142,6 +163,31 @@ class ReglaScoringControllerTest {
                 .andExpect(jsonPath("$.stackTrace").doesNotExist());
 
         verify(crearReglaScoringUseCase, never()).crear(any(CrearReglaScoringRequest.class));
+    }
+
+    @Test
+    void debeRetornar400YNoLlegarAlCasoDeUsoCuandoElIdRiesgoEsDecimal() throws Exception {
+        String payloadConIdRiesgoDecimal = """
+                {
+                  "idRiesgo": 3.7,
+                  "operador": ">=",
+                  "valorCondicion": "3000000",
+                  "puntaje": 20
+                }
+                """;
+
+        MvcResult resultado = mockMvc.perform(post("/api/v1/reglas-scoring").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payloadConIdRiesgoDecimal))
+                .andReturn();
+
+        List<Long> idRiesgoRecibido = mockingDetails(crearReglaScoringUseCase).getInvocations().stream()
+                .map(invocacion -> ((CrearReglaScoringRequest) invocacion.getArgument(0)).getIdRiesgo())
+                .toList();
+        assertThat(resultado.getResponse().getStatus())
+                .as("estado HTTP; idRiesgo recibido por el caso de uso: %s", idRiesgoRecibido)
+                .isEqualTo(400);
+        assertThat(idRiesgoRecibido).as("idRiesgo recibido por el caso de uso").isEmpty();
     }
 
     @ParameterizedTest
@@ -156,7 +202,7 @@ class ReglaScoringControllerTest {
                 }
                 """.formatted(puntajeConDecimal);
 
-        mockMvc.perform(post("/api/v1/reglas-scoring")
+        mockMvc.perform(post("/api/v1/reglas-scoring").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isBadRequest())
@@ -176,7 +222,7 @@ class ReglaScoringControllerTest {
                 }
                 """;
 
-        mockMvc.perform(post("/api/v1/reglas-scoring")
+        mockMvc.perform(post("/api/v1/reglas-scoring").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payloadConPuntajeNoNumerico))
                 .andExpect(status().isBadRequest())
@@ -196,7 +242,7 @@ class ReglaScoringControllerTest {
                 }
                 """;
 
-        mockMvc.perform(post("/api/v1/reglas-scoring")
+        mockMvc.perform(post("/api/v1/reglas-scoring").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payloadConPuntajeFueraDeRango))
                 .andExpect(status().isBadRequest())
@@ -219,7 +265,7 @@ class ReglaScoringControllerTest {
                 }
                 """.formatted(puntajeValido);
 
-        mockMvc.perform(post("/api/v1/reglas-scoring")
+        mockMvc.perform(post("/api/v1/reglas-scoring").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isCreated())
@@ -231,7 +277,7 @@ class ReglaScoringControllerTest {
         when(crearReglaScoringUseCase.crear(any(CrearReglaScoringRequest.class)))
                 .thenThrow(new ReglaScoringVariableNoEncontradaException());
 
-        mockMvc.perform(post("/api/v1/reglas-scoring")
+        mockMvc.perform(post("/api/v1/reglas-scoring").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(solicitudValida())))
                 .andExpect(status().isNotFound())
@@ -244,7 +290,7 @@ class ReglaScoringControllerTest {
         when(crearReglaScoringUseCase.crear(any(CrearReglaScoringRequest.class)))
                 .thenThrow(new ReglaScoringVariableInactivaException());
 
-        mockMvc.perform(post("/api/v1/reglas-scoring")
+        mockMvc.perform(post("/api/v1/reglas-scoring").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(solicitudValida())))
                 .andExpect(status().isConflict())
@@ -257,7 +303,7 @@ class ReglaScoringControllerTest {
         when(crearReglaScoringUseCase.crear(any(CrearReglaScoringRequest.class)))
                 .thenThrow(new ReglaScoringDuplicadaException());
 
-        mockMvc.perform(post("/api/v1/reglas-scoring")
+        mockMvc.perform(post("/api/v1/reglas-scoring").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(solicitudValida())))
                 .andExpect(status().isConflict())
@@ -270,7 +316,7 @@ class ReglaScoringControllerTest {
         when(crearReglaScoringUseCase.crear(any(CrearReglaScoringRequest.class)))
                 .thenThrow(new RuntimeException("fallo inesperado de infraestructura"));
 
-        mockMvc.perform(post("/api/v1/reglas-scoring")
+        mockMvc.perform(post("/api/v1/reglas-scoring").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(solicitudValida())))
                 .andExpect(status().isInternalServerError())
@@ -284,7 +330,7 @@ class ReglaScoringControllerTest {
         ReglaScoringResponse response = new ReglaScoringResponse(7L, 1L, OperadorScoring.MENOR, "5000000", 25);
         when(editarReglaScoringUseCase.editar(eq(7L), any(EditarReglaScoringRequest.class))).thenReturn(response);
 
-        mockMvc.perform(patch("/api/v1/reglas-scoring/7")
+        mockMvc.perform(patch("/api/v1/reglas-scoring/7").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -305,7 +351,7 @@ class ReglaScoringControllerTest {
                 }
                 """;
 
-        mockMvc.perform(patch("/api/v1/reglas-scoring/7")
+        mockMvc.perform(patch("/api/v1/reglas-scoring/7").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payloadSinOperador))
                 .andExpect(status().isBadRequest())
@@ -323,7 +369,7 @@ class ReglaScoringControllerTest {
                 }
                 """;
 
-        mockMvc.perform(patch("/api/v1/reglas-scoring/7")
+        mockMvc.perform(patch("/api/v1/reglas-scoring/7").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payloadConPuntajeDecimal))
                 .andExpect(status().isBadRequest())
@@ -337,7 +383,7 @@ class ReglaScoringControllerTest {
         when(editarReglaScoringUseCase.editar(eq(999L), any(EditarReglaScoringRequest.class)))
                 .thenThrow(new ReglaScoringNoEncontradaException());
 
-        mockMvc.perform(patch("/api/v1/reglas-scoring/999")
+        mockMvc.perform(patch("/api/v1/reglas-scoring/999").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(solicitudEdicionValida())))
                 .andExpect(status().isNotFound())
@@ -350,7 +396,7 @@ class ReglaScoringControllerTest {
         when(editarReglaScoringUseCase.editar(eq(7L), any(EditarReglaScoringRequest.class)))
                 .thenThrow(new ReglaScoringVariableInactivaException());
 
-        mockMvc.perform(patch("/api/v1/reglas-scoring/7")
+        mockMvc.perform(patch("/api/v1/reglas-scoring/7").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(solicitudEdicionValida())))
                 .andExpect(status().isConflict())
@@ -362,7 +408,7 @@ class ReglaScoringControllerTest {
         when(editarReglaScoringUseCase.editar(eq(7L), any(EditarReglaScoringRequest.class)))
                 .thenThrow(new ReglaScoringDuplicadaException());
 
-        mockMvc.perform(patch("/api/v1/reglas-scoring/7")
+        mockMvc.perform(patch("/api/v1/reglas-scoring/7").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(solicitudEdicionValida())))
                 .andExpect(status().isConflict())
@@ -371,7 +417,7 @@ class ReglaScoringControllerTest {
 
     @Test
     void debeRetornar400CuandoElIdRegladNoEsNumericoAlEditar() throws Exception {
-        mockMvc.perform(patch("/api/v1/reglas-scoring/abc")
+        mockMvc.perform(patch("/api/v1/reglas-scoring/abc").with(conRol(JwtConfig.ROL_ADMINISTRADOR))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(solicitudEdicionValida())))
                 .andExpect(status().isBadRequest())

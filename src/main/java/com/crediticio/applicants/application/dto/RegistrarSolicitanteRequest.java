@@ -1,12 +1,14 @@
 package com.crediticio.applicants.application.dto;
 
 import com.crediticio.applicants.domain.HistorialCrediticio;
+import com.crediticio.shared.util.EnteroEstrictoDeserializer;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import tools.jackson.databind.annotation.JsonDeserialize;
 
 import java.math.BigDecimal;
 
@@ -30,6 +32,7 @@ public class RegistrarSolicitanteRequest {
 
     @NotNull(message = "numeroMoras es obligatorio")
     @Min(value = 0, message = "numeroMoras debe ser mayor o igual a 0")
+    @JsonDeserialize(using = EnteroEstrictoDeserializer.class)
     private Integer numeroMoras;
 
     @NotNull(message = "historialCrediticio es obligatorio")

@@ -30,3 +30,19 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Claves y secretos (HU10): nunca se versionan ###
+*.pem
+*.key
+*.p12
+*.jks
+keys/
+secrets/
+
+### Variables de entorno locales, respaldos y estado local de herramientas ###
+.env
+.env.*
+respaldos/
+*.dump
+.claude/settings.local.json
+.claude/scheduled_tasks.lock

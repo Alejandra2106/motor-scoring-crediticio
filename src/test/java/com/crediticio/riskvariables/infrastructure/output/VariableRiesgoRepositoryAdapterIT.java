@@ -5,6 +5,7 @@ import com.crediticio.riskvariables.domain.NombreVariableRiesgo;
 import com.crediticio.riskvariables.domain.VariableRiesgo;
 import com.crediticio.riskvariables.domain.VariableRiesgoDuplicadaException;
 import com.crediticio.riskvariables.domain.VariableRiesgoNoEncontradaException;
+import com.crediticio.support.ProteccionBaseIntegracion;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,7 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.ContextConfiguration;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -27,20 +29,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-
-
-
-
-
-
-
-
-
-
-
+/**
+ * Prueba de integración de persistencia contra PostgreSQL local real (no H2).
+ *
+ * Requiere PostgreSQL local y el perfil "it" (src/test/resources/application-it.properties).
+ * No usa DB_URL: la URL se indica explícitamente con -D y {@link ProteccionBaseIntegracion}
+ * aborta antes de crear el contexto (sin conectarse) si no apunta exactamente a la base
+ * dedicada autorizada. DB_USERNAME y DB_PASSWORD se toman del entorno. Flyway aplicará las
+ * migraciones pendientes contra esa base al iniciar el contexto.
+ *
+ * Al terminar en "IT" (no "Test"), Surefire no la ejecuta con `./mvnw test`.
+ * Ejecución manual (requiere autorización expresa para usar la base dedicada):
+ * ./mvnw.cmd -B test "-Dtest=VariableRiesgoRepositoryAdapterIT" "-Dspring.profiles.active=it"
+ *     "-Dit.base-dedicada=motor_scoring_it"
+ *     "-Dspring.datasource.url=jdbc:postgresql://localhost:5432/motor_scoring_it"
+ */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("it")
+@ContextConfiguration(initializers = ProteccionBaseIntegracion.class)
 @Import(VariableRiesgoRepositoryAdapter.class)
 class VariableRiesgoRepositoryAdapterIT {
 
@@ -123,9 +130,9 @@ class VariableRiesgoRepositoryAdapterIT {
 
     @Test
     void laBaseDeDatosDebeRechazarUnaVariableFueraDelConjuntoPermitidoAunSaltandoLaValidacionDeDominio() {
-        
-        
-        
+        // El dominio (NombreVariableRiesgo) jamás permitiría un valor fuera del enum: se
+        // inserta directamente vía SQL nativo para comprobar que la restricción de integridad
+        // definitiva (ck_riesgo_variable) vive en la base de datos, no solo en la aplicación.
         assertThatThrownBy(() -> ejecutarInsertNativo(
                 "INGRESOS_MENSUALES_INVALIDA", "Descripción válida con más de diez caracteres", "ACTIVA"))
                 .isInstanceOf(SQLException.class);
@@ -133,8 +140,8 @@ class VariableRiesgoRepositoryAdapterIT {
 
     @Test
     void laBaseDeDatosDebeRechazarUnEstadoFueraDelConjuntoPermitidoAunSaltandoLaValidacionDeDominio() {
-        
-        
+        // Desde HU04, ck_riesgo_estado permite ACTIVA e INACTIVA: se comprueba aquí que la
+        // restricción de integridad definitiva sigue rechazando cualquier otro valor.
         assertThatThrownBy(() -> ejecutarInsertNativo(
                 "NIVEL_ENDEUDAMIENTO", "Descripción válida con más de diez caracteres", "SUSPENDIDA"))
                 .isInstanceOf(SQLException.class);
@@ -145,9 +152,9 @@ class VariableRiesgoRepositoryAdapterIT {
         VariableRiesgo guardada = variableRiesgoRepositoryAdapter.guardar(
                 variableRiesgoNueva(NombreVariableRiesgo.HISTORIAL_CREDITICIO));
 
-        
-        
-        
+        // El insert nativo usa una conexión JDBC ajena al rollback transaccional de
+        // @DataJpaTest (autoCommit=true), por lo que el registro insertado queda
+        // persistido de forma permanente y debe limpiarse explícitamente en el finally.
         try {
             assertThatCode(() -> ejecutarInsertNativo(
                     "ANTIGUEDAD_LABORAL", "Descripción válida con más de diez caracteres", "INACTIVA"))

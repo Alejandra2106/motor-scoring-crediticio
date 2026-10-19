@@ -9,6 +9,11 @@ import jakarta.persistence.Table;
 
 import java.time.LocalDateTime;
 
+/**
+ * HU12 CA05/CA06: {@code score_total}, {@code categoria} e {@code id_politica} se escriben una
+ * sola vez al registrar la evaluación y nunca se actualizan. Son null en evaluaciones anteriores a
+ * HU12 (requieren la migración V8, pendiente de aprobación).
+ */
 @Entity
 @Table(name = "evaluacion")
 public class EvaluacionJpaEntity {
@@ -24,12 +29,33 @@ public class EvaluacionJpaEntity {
     @Column(name = "fecha_evaluacion", nullable = false, insertable = false, updatable = false)
     private LocalDateTime fechaEvaluacion;
 
+    @Column(name = "score_total", updatable = false)
+    private Integer scoreTotal;
+
+    @Column(name = "categoria", length = 10, updatable = false)
+    private String categoria;
+
+    @Column(name = "id_politica", updatable = false)
+    private Long idPolitica;
+
+    /**
+     * HU14 (V11): estado de la saga. Se inserta PENDIENTE y solo lo cambia el registro del resultado de la
+     * saga, con una sentencia propia (nunca una actualización de la entidad). Null antes de la saga.
+     */
+    @Column(name = "estado", length = 10, updatable = false)
+    private String estado;
+
     protected EvaluacionJpaEntity() {
-        
+        // requerido por JPA
     }
 
-    public EvaluacionJpaEntity(Long idSolicitante) {
+    public EvaluacionJpaEntity(Long idSolicitante, Integer scoreTotal, String categoria, Long idPolitica,
+            String estado) {
         this.idSolicitante = idSolicitante;
+        this.scoreTotal = scoreTotal;
+        this.categoria = categoria;
+        this.idPolitica = idPolitica;
+        this.estado = estado;
     }
 
     public Long getIdEvaluacion() {
@@ -42,5 +68,21 @@ public class EvaluacionJpaEntity {
 
     public LocalDateTime getFechaEvaluacion() {
         return fechaEvaluacion;
+    }
+
+    public Integer getScoreTotal() {
+        return scoreTotal;
+    }
+
+    public String getCategoria() {
+        return categoria;
+    }
+
+    public Long getIdPolitica() {
+        return idPolitica;
+    }
+
+    public String getEstado() {
+        return estado;
     }
 }

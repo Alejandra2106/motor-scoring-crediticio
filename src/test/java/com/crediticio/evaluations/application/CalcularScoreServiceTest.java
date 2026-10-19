@@ -2,16 +2,24 @@ package com.crediticio.evaluations.application;
 
 import com.crediticio.evaluations.application.dto.CalcularScoreRequest;
 import com.crediticio.evaluations.application.dto.EvaluacionResponse;
+import com.crediticio.evaluations.domain.ClasificacionEvaluacion;
+import com.crediticio.evaluations.domain.EstadoEvaluacion;
 import com.crediticio.evaluations.domain.Evaluacion;
+import com.crediticio.evaluations.domain.PoliticaReintentos;
+import com.crediticio.evaluations.domain.EvaluacionSinPoliticaVigenteException;
 import com.crediticio.evaluations.domain.NivelEndeudamientoIndeterminadoException;
 import com.crediticio.evaluations.domain.NombreVariableEvaluada;
+import com.crediticio.evaluations.domain.PuntajeSinClasificacionException;
 import com.crediticio.evaluations.domain.SolicitanteEvaluacionNoEncontradoException;
 import com.crediticio.evaluations.domain.SolicitanteParaEvaluacion;
+import com.crediticio.evaluations.ports.output.ClasificacionRiesgoPort;
 import com.crediticio.evaluations.ports.output.ConsultarSolicitanteEvaluacionPort;
 import com.crediticio.evaluations.ports.output.ConsultarVariablesActivasEvaluacionPort;
 import com.crediticio.evaluations.ports.output.EvaluacionRepositoryPort;
 import com.crediticio.evaluations.ports.output.ReglasScoringConsultaPort;
+import com.crediticio.evaluations.ports.output.ResultadoClasificacion;
 import com.crediticio.evaluations.ports.output.ResultadoReglaEvaluada;
+import com.crediticio.evaluations.ports.output.TrabajoRecomendacionPort;
 import com.crediticio.evaluations.ports.output.VariableActivaEvaluada;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,6 +29,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -30,9 +39,12 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -49,14 +61,53 @@ class CalcularScoreServiceTest {
     private ReglasScoringConsultaPort reglasScoringConsultaPort;
 
     @Mock
+    private ClasificacionRiesgoPort clasificacionRiesgoPort;
+
+    @Mock
     private EvaluacionRepositoryPort evaluacionRepositoryPort;
+
+    @Mock
+    private TrabajoRecomendacionPort trabajoRecomendacionPort;
+
+    private static final Long ID_POLITICA = 3L;
+    private static final Integer VERSION_POLITICA = 2;
+    private static final Duration CONCESION = Duration.ofSeconds(30);
 
     private CalcularScoreService service;
 
     @BeforeEach
     void inicializarServicio() {
+        PoliticaReintentos politica = new PoliticaReintentos(10, Duration.ofSeconds(5), Duration.ofSeconds(300), 0.2,
+                CONCESION, () -> 0.5);
         service = new CalcularScoreService(consultarSolicitantePort, consultarVariablesActivasPort,
-                reglasScoringConsultaPort, evaluacionRepositoryPort, new EvaluacionMapper());
+                reglasScoringConsultaPort, clasificacionRiesgoPort, evaluacionRepositoryPort, trabajoRecomendacionPort,
+                politica, new EvaluacionMapper());
+    }
+
+    /** HU14: la evaluación nace PENDIENTE y su trabajo de la saga se crea con la concesión del intento en línea. */
+    @Test
+    void debeRegistrarLaEvaluacionPendienteYCrearSuTrabajoDeLaSaga() {
+        when(consultarSolicitantePort.buscarPorId(1L)).thenReturn(Optional.of(solicitante(1L)));
+        when(consultarVariablesActivasPort.listarActivas()).thenReturn(List.of());
+        politicaVigenteClasificaComo("MEDIO");
+        when(evaluacionRepositoryPort.guardar(any(Evaluacion.class)))
+                .thenAnswer(invocation -> reconstruirConId(invocation.getArgument(0), 100L));
+
+        EvaluacionRegistrada registrada = service.registrar(new CalcularScoreRequest(1L, null));
+
+        assertThat(registrada.evaluacion().getEstado()).isEqualTo(EstadoEvaluacion.PENDIENTE);
+        assertThat(registrada.tokenConcesion()).isNotNull();
+        verify(trabajoRecomendacionPort).crear(100L, registrada.tokenConcesion(), CONCESION);
+        assertThat(service.calcular(new CalcularScoreRequest(1L, null)).getEstado()).isEqualTo("PENDIENTE");
+    }
+
+    @Test
+    void siLaEvaluacionSeRechazaNoDebeCrearseNingunTrabajo() {
+        when(consultarSolicitantePort.buscarPorId(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.registrar(new CalcularScoreRequest(99L, null)))
+                .isInstanceOf(SolicitanteEvaluacionNoEncontradoException.class);
+        verify(trabajoRecomendacionPort, never()).crear(anyLong(), any(), any());
     }
 
     @Test
@@ -83,6 +134,7 @@ class CalcularScoreServiceTest {
     void debeIdentificarElSolicitantePorIdCuandoSeProporciona() {
         when(consultarSolicitantePort.buscarPorId(1L)).thenReturn(Optional.of(solicitante(1L)));
         when(consultarVariablesActivasPort.listarActivas()).thenReturn(List.of());
+        politicaVigenteClasificaComo("MEDIO");
         when(evaluacionRepositoryPort.guardar(any(Evaluacion.class)))
                 .thenAnswer(invocation -> reconstruirConId(invocation.getArgument(0), 100L));
 
@@ -96,6 +148,7 @@ class CalcularScoreServiceTest {
     void debeIdentificarElSolicitantePorDocumentoCuandoSeProporciona() {
         when(consultarSolicitantePort.buscarPorNumeroDocumento("1234567890")).thenReturn(Optional.of(solicitante(1L)));
         when(consultarVariablesActivasPort.listarActivas()).thenReturn(List.of());
+        politicaVigenteClasificaComo("MEDIO");
         when(evaluacionRepositoryPort.guardar(any(Evaluacion.class)))
                 .thenAnswer(invocation -> reconstruirConId(invocation.getArgument(0), 100L));
 
@@ -109,6 +162,7 @@ class CalcularScoreServiceTest {
     void debeCrearEvaluacionSinDetallesCuandoNoHayVariablesActivas() {
         when(consultarSolicitantePort.buscarPorId(1L)).thenReturn(Optional.of(solicitante(1L)));
         when(consultarVariablesActivasPort.listarActivas()).thenReturn(List.of());
+        politicaVigenteClasificaComo("MEDIO");
         when(evaluacionRepositoryPort.guardar(any(Evaluacion.class)))
                 .thenAnswer(invocation -> reconstruirConId(invocation.getArgument(0), 100L));
 
@@ -125,6 +179,7 @@ class CalcularScoreServiceTest {
         when(consultarVariablesActivasPort.listarActivas()).thenReturn(
                 List.of(new VariableActivaEvaluada(1L, NombreVariableEvaluada.INGRESOS_MENSUALES)));
         when(reglasScoringConsultaPort.idsConReglasVigentes(Set.of(1L))).thenReturn(Set.of());
+        politicaVigenteClasificaComo("MEDIO");
         when(evaluacionRepositoryPort.guardar(any(Evaluacion.class)))
                 .thenAnswer(invocation -> reconstruirConId(invocation.getArgument(0), 100L));
 
@@ -144,6 +199,7 @@ class CalcularScoreServiceTest {
         when(reglasScoringConsultaPort.evaluar(anyMap())).thenReturn(List.of(
                 new ResultadoReglaEvaluada(10L, ">=", "3000000", 20, true, 20),
                 new ResultadoReglaEvaluada(11L, "=", "MALO", 30, false, 0)));
+        politicaVigenteClasificaComo("MEDIO");
         when(evaluacionRepositoryPort.guardar(any(Evaluacion.class)))
                 .thenAnswer(invocation -> reconstruirConId(invocation.getArgument(0), 100L));
 
@@ -159,11 +215,12 @@ class CalcularScoreServiceTest {
         when(consultarVariablesActivasPort.listarActivas()).thenReturn(List.of(
                 new VariableActivaEvaluada(1L, NombreVariableEvaluada.INGRESOS_MENSUALES),
                 new VariableActivaEvaluada(2L, NombreVariableEvaluada.NIVEL_ENDEUDAMIENTO)));
-        
-        
+        // Solo la variable 1 tiene reglas vigentes: NIVEL_ENDEUDAMIENTO (variable 2, sin reglas)
+        // nunca debería intentar resolverse, evitando así un bloqueo D8 innecesario.
         when(reglasScoringConsultaPort.idsConReglasVigentes(Set.of(1L, 2L))).thenReturn(Set.of(1L));
         when(reglasScoringConsultaPort.evaluar(Map.of(1L, "4000000"))).thenReturn(List.of(
                 new ResultadoReglaEvaluada(10L, ">=", "3000000", 20, true, 20)));
+        politicaVigenteClasificaComo("MEDIO");
         when(evaluacionRepositoryPort.guardar(any(Evaluacion.class)))
                 .thenAnswer(invocation -> reconstruirConId(invocation.getArgument(0), 100L));
 
@@ -191,6 +248,7 @@ class CalcularScoreServiceTest {
     void debeGuardarLaEvaluacionConElIdSolicitanteCorrecto() {
         when(consultarSolicitantePort.buscarPorId(7L)).thenReturn(Optional.of(solicitante(7L)));
         when(consultarVariablesActivasPort.listarActivas()).thenReturn(List.of());
+        politicaVigenteClasificaComo("MEDIO");
         when(evaluacionRepositoryPort.guardar(any(Evaluacion.class)))
                 .thenAnswer(invocation -> reconstruirConId(invocation.getArgument(0), 100L));
 
@@ -201,6 +259,79 @@ class CalcularScoreServiceTest {
         assertThat(captor.getValue().getIdSolicitante()).isEqualTo(7L);
     }
 
+    @Test
+    void debeClasificarElPuntajeTotalYGuardarLaCategoriaConLaVersionDeLaPolitica() {
+        when(consultarSolicitantePort.buscarPorId(1L)).thenReturn(Optional.of(solicitante(1L)));
+        when(consultarVariablesActivasPort.listarActivas()).thenReturn(
+                List.of(new VariableActivaEvaluada(1L, NombreVariableEvaluada.INGRESOS_MENSUALES)));
+        when(reglasScoringConsultaPort.idsConReglasVigentes(Set.of(1L))).thenReturn(Set.of(1L));
+        when(reglasScoringConsultaPort.evaluar(anyMap())).thenReturn(List.of(
+                new ResultadoReglaEvaluada(10L, ">=", "3000000", 20, true, 20)));
+        when(clasificacionRiesgoPort.clasificarConPoliticaVigente(20))
+                .thenReturn(Optional.of(new ResultadoClasificacion(ID_POLITICA, VERSION_POLITICA, "BAJO")));
+        when(evaluacionRepositoryPort.guardar(any(Evaluacion.class)))
+                .thenAnswer(invocation -> reconstruirConId(invocation.getArgument(0), 100L));
+
+        EvaluacionResponse response = service.calcular(new CalcularScoreRequest(1L, null));
+
+        ArgumentCaptor<Evaluacion> captor = ArgumentCaptor.forClass(Evaluacion.class);
+        verify(evaluacionRepositoryPort).guardar(captor.capture());
+        assertThat(captor.getValue().getClasificacion())
+                .isEqualTo(new ClasificacionEvaluacion("BAJO", ID_POLITICA, VERSION_POLITICA));
+        assertThat(response.getScoreTotal()).isEqualTo(20);
+        assertThat(response.getCategoria()).isEqualTo("BAJO");
+        assertThat(response.getIdPolitica()).isEqualTo(ID_POLITICA);
+        assertThat(response.getVersionPolitica()).isEqualTo(VERSION_POLITICA);
+    }
+
+    @Test
+    void debeConsultarLaPoliticaVigenteUnaSolaVezPorEvaluacion() {
+        when(consultarSolicitantePort.buscarPorId(1L)).thenReturn(Optional.of(solicitante(1L)));
+        when(consultarVariablesActivasPort.listarActivas()).thenReturn(List.of());
+        politicaVigenteClasificaComo("MEDIO");
+        when(evaluacionRepositoryPort.guardar(any(Evaluacion.class)))
+                .thenAnswer(invocation -> reconstruirConId(invocation.getArgument(0), 100L));
+
+        service.calcular(new CalcularScoreRequest(1L, null));
+
+        verify(clasificacionRiesgoPort, times(1)).clasificarConPoliticaVigente(anyInt());
+    }
+
+    @Test
+    void sinPoliticaVigenteDebeRechazarLaEvaluacionSinGuardarNada() {
+        when(consultarSolicitantePort.buscarPorId(1L)).thenReturn(Optional.of(solicitante(1L)));
+        when(consultarVariablesActivasPort.listarActivas()).thenReturn(List.of());
+        when(clasificacionRiesgoPort.clasificarConPoliticaVigente(0)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.calcular(new CalcularScoreRequest(1L, null)))
+                .isInstanceOf(EvaluacionSinPoliticaVigenteException.class);
+
+        verify(evaluacionRepositoryPort, never()).guardar(any(Evaluacion.class));
+    }
+
+    @Test
+    void unPuntajeSinCategoriaEnLaPoliticaDebeRechazarLaEvaluacionSinGuardarNada() {
+        when(consultarSolicitantePort.buscarPorId(1L)).thenReturn(Optional.of(solicitante(1L)));
+        when(consultarVariablesActivasPort.listarActivas()).thenReturn(
+                List.of(new VariableActivaEvaluada(1L, NombreVariableEvaluada.INGRESOS_MENSUALES)));
+        when(reglasScoringConsultaPort.idsConReglasVigentes(Set.of(1L))).thenReturn(Set.of(1L));
+        when(reglasScoringConsultaPort.evaluar(anyMap())).thenReturn(List.of(
+                new ResultadoReglaEvaluada(10L, ">=", "3000000", 150, true, 150)));
+        when(clasificacionRiesgoPort.clasificarConPoliticaVigente(150))
+                .thenReturn(Optional.of(new ResultadoClasificacion(ID_POLITICA, VERSION_POLITICA, null)));
+
+        assertThatThrownBy(() -> service.calcular(new CalcularScoreRequest(1L, null)))
+                .isInstanceOf(PuntajeSinClasificacionException.class)
+                .hasMessageContaining("150");
+
+        verify(evaluacionRepositoryPort, never()).guardar(any(Evaluacion.class));
+    }
+
+    private void politicaVigenteClasificaComo(String categoria) {
+        when(clasificacionRiesgoPort.clasificarConPoliticaVigente(anyInt()))
+                .thenReturn(Optional.of(new ResultadoClasificacion(ID_POLITICA, VERSION_POLITICA, categoria)));
+    }
+
     private SolicitanteParaEvaluacion solicitante(Long idSolicitante) {
         return new SolicitanteParaEvaluacion(idSolicitante, new BigDecimal("4000000"), new BigDecimal("1200000"),
                 0, "BUENO", new BigDecimal("2"));
@@ -208,6 +339,7 @@ class CalcularScoreServiceTest {
 
     private Evaluacion reconstruirConId(Evaluacion evaluacion, Long idEvaluacion) {
         return Evaluacion.reconstruir(idEvaluacion, evaluacion.getIdSolicitante(), LocalDateTime.now(),
+                evaluacion.getScoreTotal(), evaluacion.getClasificacion(), evaluacion.getEstado(),
                 evaluacion.getDetalles());
     }
 }
