@@ -130,9 +130,9 @@ class VariableRiesgoRepositoryAdapterIT {
 
     @Test
     void laBaseDeDatosDebeRechazarUnaVariableFueraDelConjuntoPermitidoAunSaltandoLaValidacionDeDominio() {
-        
-        
-        
+        // El dominio (NombreVariableRiesgo) jamás permitiría un valor fuera del enum: se
+        // inserta directamente vía SQL nativo para comprobar que la restricción de integridad
+        // definitiva (ck_riesgo_variable) vive en la base de datos, no solo en la aplicación.
         assertThatThrownBy(() -> ejecutarInsertNativo(
                 "INGRESOS_MENSUALES_INVALIDA", "Descripción válida con más de diez caracteres", "ACTIVA"))
                 .isInstanceOf(SQLException.class);
@@ -140,8 +140,8 @@ class VariableRiesgoRepositoryAdapterIT {
 
     @Test
     void laBaseDeDatosDebeRechazarUnEstadoFueraDelConjuntoPermitidoAunSaltandoLaValidacionDeDominio() {
-        
-        
+        // Desde HU04, ck_riesgo_estado permite ACTIVA e INACTIVA: se comprueba aquí que la
+        // restricción de integridad definitiva sigue rechazando cualquier otro valor.
         assertThatThrownBy(() -> ejecutarInsertNativo(
                 "NIVEL_ENDEUDAMIENTO", "Descripción válida con más de diez caracteres", "SUSPENDIDA"))
                 .isInstanceOf(SQLException.class);
@@ -152,9 +152,9 @@ class VariableRiesgoRepositoryAdapterIT {
         VariableRiesgo guardada = variableRiesgoRepositoryAdapter.guardar(
                 variableRiesgoNueva(NombreVariableRiesgo.HISTORIAL_CREDITICIO));
 
-        
-        
-        
+        // El insert nativo usa una conexión JDBC ajena al rollback transaccional de
+        // @DataJpaTest (autoCommit=true), por lo que el registro insertado queda
+        // persistido de forma permanente y debe limpiarse explícitamente en el finally.
         try {
             assertThatCode(() -> ejecutarInsertNativo(
                     "ANTIGUEDAD_LABORAL", "Descripción válida con más de diez caracteres", "INACTIVA"))

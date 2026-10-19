@@ -46,7 +46,7 @@ public class EvaluacionJpaEntity {
     private String estado;
 
     protected EvaluacionJpaEntity() {
-
+        // requerido por JPA
     }
 
     public EvaluacionJpaEntity(Long idSolicitante, Integer scoreTotal, String categoria, Long idPolitica,
