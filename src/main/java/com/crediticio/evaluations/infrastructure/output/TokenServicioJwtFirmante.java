@@ -6,6 +6,7 @@ import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.KeyUse;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.Resource;
 import org.springframework.security.converter.RsaKeyConverters;
@@ -43,6 +44,8 @@ public class TokenServicioJwtFirmante {
     private final ServicioJwtProperties propiedades;
     private final Clock reloj;
 
+    // Con dos constructores, Spring necesita saber cuál usar; el otro solo inyecta el reloj en las pruebas
+    @Autowired
     public TokenServicioJwtFirmante(ServicioJwtProperties propiedades, JwtProperties jwtUsuarios) {
         this(propiedades, jwtUsuarios, Clock.systemUTC());
     }
