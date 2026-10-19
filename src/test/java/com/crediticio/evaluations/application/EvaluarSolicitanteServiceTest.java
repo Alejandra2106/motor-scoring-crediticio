@@ -54,6 +54,16 @@ class EvaluarSolicitanteServiceTest {
         assertThat(servicio.calcular(SOLICITUD).getEstado()).isEqualTo("PENDIENTE");
     }
 
+    /** La evaluación ya está confirmada: un 500 haría que el cliente la repitiera y la duplicara. */
+    @Test
+    void siElIntentoEnLineaFallaConUnaExcepcionDebeResponderPendiente() {
+        when(calcularScoreService.registrar(SOLICITUD)).thenReturn(registrada());
+        when(proceso.intentar(7L, TOKEN, ModoIntento.EN_LINEA, 1))
+                .thenThrow(new org.springframework.dao.QueryTimeoutException("base no disponible"));
+
+        assertThat(servicio.calcular(SOLICITUD).getEstado()).isEqualTo("PENDIENTE");
+    }
+
     @Test
     void siElRegistroFallaNoDebeIntentarseLaGeneracion() {
         when(calcularScoreService.registrar(SOLICITUD)).thenThrow(new IllegalStateException("fallo"));
