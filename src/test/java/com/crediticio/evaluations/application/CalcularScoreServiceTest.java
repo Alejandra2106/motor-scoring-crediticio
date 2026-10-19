@@ -3,7 +3,9 @@ package com.crediticio.evaluations.application;
 import com.crediticio.evaluations.application.dto.CalcularScoreRequest;
 import com.crediticio.evaluations.application.dto.EvaluacionResponse;
 import com.crediticio.evaluations.domain.ClasificacionEvaluacion;
+import com.crediticio.evaluations.domain.EstadoEvaluacion;
 import com.crediticio.evaluations.domain.Evaluacion;
+import com.crediticio.evaluations.domain.PoliticaReintentos;
 import com.crediticio.evaluations.domain.EvaluacionSinPoliticaVigenteException;
 import com.crediticio.evaluations.domain.NivelEndeudamientoIndeterminadoException;
 import com.crediticio.evaluations.domain.NombreVariableEvaluada;
@@ -17,6 +19,7 @@ import com.crediticio.evaluations.ports.output.EvaluacionRepositoryPort;
 import com.crediticio.evaluations.ports.output.ReglasScoringConsultaPort;
 import com.crediticio.evaluations.ports.output.ResultadoClasificacion;
 import com.crediticio.evaluations.ports.output.ResultadoReglaEvaluada;
+import com.crediticio.evaluations.ports.output.TrabajoRecomendacionPort;
 import com.crediticio.evaluations.ports.output.VariableActivaEvaluada;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,6 +29,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.never;
@@ -61,15 +66,48 @@ class CalcularScoreServiceTest {
     @Mock
     private EvaluacionRepositoryPort evaluacionRepositoryPort;
 
+    @Mock
+    private TrabajoRecomendacionPort trabajoRecomendacionPort;
+
     private static final Long ID_POLITICA = 3L;
     private static final Integer VERSION_POLITICA = 2;
+    private static final Duration CONCESION = Duration.ofSeconds(30);
 
     private CalcularScoreService service;
 
     @BeforeEach
     void inicializarServicio() {
+        PoliticaReintentos politica = new PoliticaReintentos(10, Duration.ofSeconds(5), Duration.ofSeconds(300), 0.2,
+                CONCESION, () -> 0.5);
         service = new CalcularScoreService(consultarSolicitantePort, consultarVariablesActivasPort,
-                reglasScoringConsultaPort, clasificacionRiesgoPort, evaluacionRepositoryPort, new EvaluacionMapper());
+                reglasScoringConsultaPort, clasificacionRiesgoPort, evaluacionRepositoryPort, trabajoRecomendacionPort,
+                politica, new EvaluacionMapper());
+    }
+
+    /** HU14: la evaluación nace PENDIENTE y su trabajo de la saga se crea con la concesión del intento en línea. */
+    @Test
+    void debeRegistrarLaEvaluacionPendienteYCrearSuTrabajoDeLaSaga() {
+        when(consultarSolicitantePort.buscarPorId(1L)).thenReturn(Optional.of(solicitante(1L)));
+        when(consultarVariablesActivasPort.listarActivas()).thenReturn(List.of());
+        politicaVigenteClasificaComo("MEDIO");
+        when(evaluacionRepositoryPort.guardar(any(Evaluacion.class)))
+                .thenAnswer(invocation -> reconstruirConId(invocation.getArgument(0), 100L));
+
+        EvaluacionRegistrada registrada = service.registrar(new CalcularScoreRequest(1L, null));
+
+        assertThat(registrada.evaluacion().getEstado()).isEqualTo(EstadoEvaluacion.PENDIENTE);
+        assertThat(registrada.tokenConcesion()).isNotNull();
+        verify(trabajoRecomendacionPort).crear(100L, registrada.tokenConcesion(), CONCESION);
+        assertThat(service.calcular(new CalcularScoreRequest(1L, null)).getEstado()).isEqualTo("PENDIENTE");
+    }
+
+    @Test
+    void siLaEvaluacionSeRechazaNoDebeCrearseNingunTrabajo() {
+        when(consultarSolicitantePort.buscarPorId(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.registrar(new CalcularScoreRequest(99L, null)))
+                .isInstanceOf(SolicitanteEvaluacionNoEncontradoException.class);
+        verify(trabajoRecomendacionPort, never()).crear(anyLong(), any(), any());
     }
 
     @Test
@@ -301,6 +339,7 @@ class CalcularScoreServiceTest {
 
     private Evaluacion reconstruirConId(Evaluacion evaluacion, Long idEvaluacion) {
         return Evaluacion.reconstruir(idEvaluacion, evaluacion.getIdSolicitante(), LocalDateTime.now(),
-                evaluacion.getScoreTotal(), evaluacion.getClasificacion(), evaluacion.getDetalles());
+                evaluacion.getScoreTotal(), evaluacion.getClasificacion(), evaluacion.getEstado(),
+                evaluacion.getDetalles());
     }
 }

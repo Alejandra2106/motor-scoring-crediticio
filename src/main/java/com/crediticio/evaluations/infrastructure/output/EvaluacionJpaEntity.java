@@ -38,15 +38,24 @@ public class EvaluacionJpaEntity {
     @Column(name = "id_politica", updatable = false)
     private Long idPolitica;
 
+    /**
+     * HU14 (V11): estado de la saga. Se inserta PENDIENTE y solo lo cambia el registro del resultado de la
+     * saga, con una sentencia propia (nunca una actualización de la entidad). Null antes de la saga.
+     */
+    @Column(name = "estado", length = 10, updatable = false)
+    private String estado;
+
     protected EvaluacionJpaEntity() {
-        
+
     }
 
-    public EvaluacionJpaEntity(Long idSolicitante, Integer scoreTotal, String categoria, Long idPolitica) {
+    public EvaluacionJpaEntity(Long idSolicitante, Integer scoreTotal, String categoria, Long idPolitica,
+            String estado) {
         this.idSolicitante = idSolicitante;
         this.scoreTotal = scoreTotal;
         this.categoria = categoria;
         this.idPolitica = idPolitica;
+        this.estado = estado;
     }
 
     public Long getIdEvaluacion() {
@@ -71,5 +80,9 @@ public class EvaluacionJpaEntity {
 
     public Long getIdPolitica() {
         return idPolitica;
+    }
+
+    public String getEstado() {
+        return estado;
     }
 }

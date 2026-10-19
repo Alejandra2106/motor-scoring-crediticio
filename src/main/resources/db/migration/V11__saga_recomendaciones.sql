@@ -1,7 +1,3 @@
--- PROPUESTA (HU14). No está en src/main/resources/db/migration: no la aplica la aplicación ni la
--- suite. Solo la usa TrabajoRecomendacionV11MigracionIT en un esquema temporal de motor_scoring_it.
--- Al promoverla se elimina esta cabecera de propuesta (las sentencias SQL no cambian).
---
 -- HU14: saga de recomendaciones. Estado de la evaluación y outbox transaccional.
 -- Las evaluaciones anteriores a la saga conservan estado NULL y no pueden incorporarse a ella.
 -- Sin restricciones NOT VALID: esta migración no bloquea las filas históricas.

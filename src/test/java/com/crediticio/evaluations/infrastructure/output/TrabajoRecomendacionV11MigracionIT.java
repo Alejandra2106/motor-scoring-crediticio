@@ -17,7 +17,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * HU14 (propuesta, no promovida): aplicación de la migración V11 de database/propuestas/hu14 (estado
+ * HU14: aplicación de la migración V11 (src/main/resources/db/migration, validada con esta prueba antes de su
+ * promoción; se aplica junto con V10) (estado
  * de la evaluación y outbox trabajo_recomendacion de la saga) en un esquema aislado y temporal.
  *
  * Antes de abrir cualquier conexión exige, por igualdad exacta de texto, que -Dit.base-dedicada sea
@@ -50,7 +51,6 @@ class TrabajoRecomendacionV11MigracionIT {
     private static final String BASE_AUTORIZADA = "motor_scoring_it";
     private static final String URL_AUTORIZADA = "jdbc:postgresql://localhost:5432/" + BASE_AUTORIZADA;
     private static final String UBICACION_MIGRACIONES = "classpath:db/migration";
-    private static final String UBICACION_PROPUESTA = "filesystem:database/propuestas/hu14";
     private static final String CHECK_VIOLATION = "23514";
     private static final String OBJECT_NOT_IN_PREREQUISITE_STATE = "55000";
     private static final String LOCK_NOT_AVAILABLE = "55P03";
@@ -169,7 +169,7 @@ class TrabajoRecomendacionV11MigracionIT {
     void v11DebeQuedarAplicadaConSusTriggersYFunciones() throws SQLException {
         try (Connection connection = conectar()) {
             assertThat(consultarTexto(connection, "SELECT string_agg(version, ',' ORDER BY installed_rank) FROM "
-                    + ESQUEMA + ".flyway_schema_history WHERE success")).endsWith(",9,11");
+                    + ESQUEMA + ".flyway_schema_history WHERE success")).endsWith(",9,10,11");
             assertThat(triggersDe(connection, "evaluacion")).isEqualTo("tg_evaluacion_categoria_coherente,"
                     + "tg_evaluacion_clasificacion_inmutable,tg_evaluacion_estado_inicial,"
                     + "tg_evaluacion_estado_transicion,tg_evaluacion_saga_consistente,"
@@ -733,7 +733,7 @@ class TrabajoRecomendacionV11MigracionIT {
         return Flyway.configure()
                 .dataSource(url, usuario, clave)
                 .schemas(ESQUEMA)
-                .locations(UBICACION_MIGRACIONES, UBICACION_PROPUESTA)
+                .locations(UBICACION_MIGRACIONES)
                 .cleanDisabled(true)
                 .target(version)
                 .load();

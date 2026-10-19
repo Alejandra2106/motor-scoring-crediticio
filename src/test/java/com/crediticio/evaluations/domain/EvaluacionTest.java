@@ -107,4 +107,38 @@ class EvaluacionTest {
         assertThatThrownBy(() -> Evaluacion.reconstruir(5L, 1L, LocalDateTime.now(), null, CLASIFICACION, List.of()))
                 .isInstanceOf(IllegalStateException.class);
     }
+
+    // ---- HU14: estado de la saga ----
+
+    @Test
+    void unaEvaluacionNuevaDebeNacerPendiente() {
+        assertThat(Evaluacion.nueva(1L, List.of(), CLASIFICACION).getEstado()).isEqualTo(EstadoEvaluacion.PENDIENTE);
+    }
+
+    @Test
+    void soloUnaEvaluacionPendientePuedeCompletarse() {
+        Evaluacion pendiente = Evaluacion.reconstruir(5L, 1L, LocalDateTime.now(), 0, CLASIFICACION,
+                EstadoEvaluacion.PENDIENTE, List.of());
+
+        Evaluacion completada = pendiente.completada();
+
+        assertThat(completada.getEstado()).isEqualTo(EstadoEvaluacion.COMPLETADA);
+        assertThat(completada.getIdEvaluacion()).isEqualTo(5L);
+        assertThat(completada.getClasificacion()).isEqualTo(CLASIFICACION);
+        assertThatThrownBy(completada::completada).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void unaEvaluacionAnteriorALaSagaNoPuedeIncorporarseAElla() {
+        Evaluacion historica = Evaluacion.reconstruir(5L, 1L, LocalDateTime.now(), 0, CLASIFICACION, List.of());
+
+        assertThat(historica.getEstado()).isNull();
+        assertThatThrownBy(historica::completada).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void unaEvaluacionDeLaSagaDebeEstarClasificada() {
+        assertThatThrownBy(() -> Evaluacion.reconstruir(5L, 1L, LocalDateTime.now(), null, null,
+                EstadoEvaluacion.PENDIENTE, List.of())).isInstanceOf(IllegalStateException.class);
+    }
 }

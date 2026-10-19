@@ -2,6 +2,7 @@ package com.crediticio.evaluations.infrastructure.output;
 
 import com.crediticio.evaluations.domain.ClasificacionEvaluacion;
 import com.crediticio.evaluations.domain.DetalleEvaluacion;
+import com.crediticio.evaluations.domain.EstadoEvaluacion;
 import com.crediticio.evaluations.domain.Evaluacion;
 import com.crediticio.evaluations.ports.output.EvaluacionConsultaPort;
 import com.crediticio.evaluations.ports.output.EvaluacionRepositoryPort;
@@ -38,7 +39,8 @@ public class EvaluacionRepositoryAdapter implements EvaluacionRepositoryPort, Ev
                 evaluacion.getIdSolicitante(),
                 evaluacion.getScoreTotal(),
                 clasificacion.categoria(),
-                clasificacion.idPolitica()));
+                clasificacion.idPolitica(),
+                evaluacion.getEstado() == null ? null : evaluacion.getEstado().name()));
         entityManager.flush();
         entityManager.refresh(evaluacionEntity);
 
@@ -88,6 +90,7 @@ public class EvaluacionRepositoryAdapter implements EvaluacionRepositoryPort, Ev
                 entity.getFechaEvaluacion(),
                 entity.getScoreTotal(),
                 clasificacion,
+                entity.getEstado() == null ? null : EstadoEvaluacion.valueOf(entity.getEstado()),
                 detalles.stream().map(this::aDominioDetalle).toList());
     }
 

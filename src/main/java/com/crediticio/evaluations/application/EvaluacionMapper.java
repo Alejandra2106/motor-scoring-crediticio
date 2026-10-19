@@ -20,6 +20,7 @@ public class EvaluacionMapper {
                 clasificacion == null ? null : clasificacion.categoria(),
                 clasificacion == null ? null : clasificacion.idPolitica(),
                 clasificacion == null ? null : clasificacion.versionPolitica(),
+                evaluacion.getEstado() == null ? null : evaluacion.getEstado().name(),
                 evaluacion.getDetalles().stream().map(this::aDetalleResponse).toList());
     }
 

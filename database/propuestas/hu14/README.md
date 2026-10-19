@@ -1,16 +1,17 @@
-# HU14 · Migración V11 (propuesta, no promovida)
+# HU14 · Migración V11 (promovida)
 
 Estado de la evaluación (`PENDIENTE` / `COMPLETADA`) y outbox transaccional `trabajo_recomendacion` de la
-saga de recomendaciones. Creada el 2026-10-18 como propuesta en esta carpeta: no está en
-`src/main/resources/db/migration`, así que ni la aplicación ni la suite la aplican. Solo la usa
-`TrabajoRecomendacionV11MigracionIT`, en un esquema temporal de `motor_scoring_it`.
+saga de recomendaciones. Validada como propuesta en esta carpeta y promovida el 2026-10-18 (rama
+`feature/hu14-saga-recomendaciones`) a `src/main/resources/db/migration/V11__saga_recomendaciones.sql`, sin
+su cabecera de propuesta: las sentencias SQL son idénticas. La propuesta original y su SHA-256 se conservan
+en `build/respaldo-v11-promocion/`, que Git ignora. Se aplica junto con V10 (índices), que va antes.
 
 Autorizado el 2026-10-18: la tabla `trabajo_recomendacion` en `public` (OBX) y este SQL como base de V11;
 la barrera contra tokens antiguos en la aplicación (opción A); la política de reintentos ante interbloqueos
 y la creación del trabajo siempre con la concesión del primer intento; la separación de roles, solo como
-plan. La ejecución de la prueba de integración se autorizó y se realizó el 2026-10-18 (ver más abajo).
-**No autorizado todavía:** promover la migración, aplicarla en cualquier base ni escribir el script de
-permisos.
+plan; la implementación de HU14. **V11 no está aplicada en `motor_scoring_it.public` ni en `motor_scoring`:**
+como cualquier arranque de scoring-api con Flyway la aplicaría, su despliegue en una base compartida debe
+coordinarse (ver "Riesgos y condiciones", punto 5).
 
 ## Qué hace
 
